@@ -37,10 +37,9 @@
   }
   const sym = (L, sm) => `<span class="sym ${L.type} ${sm ? 'sm' : ''}" style="--c:${L.color};--tc:${L.textColor}">${L.type === 'jr' ? L.code : L.code}</span>`;
   // Station-number badge (JR square / Metro-style ring) when num is given, otherwise the plain line symbol.
-  // Pass the station as 4th arg to get the 3-letter JR station code on top (large badges only).
-  const bdg = (L, num, sm, st) => num == null
+  const bdg = (L, num, sm) => num == null
     ? `<span class="bdg">${sym(L, sm)}</span>`
-    : `<span class="bdg">${StationBadge.svg(L, num, { size: sm ? 28 : 48, code: !sm && st ? StationBadge.abbr(st.id) : '' })}</span>`;
+    : `<span class="bdg">${StationBadge.svg(L, num, { size: sm ? 28 : 48 })}</span>`;
   const lineName = L => nm(L);
   const normQ = s => s.toLowerCase().replace(/[\s\-・'’.,]/g, '');
 
@@ -615,7 +614,7 @@
   function stationHTML(st) {
     const xfers = st.lines.filter(x => !x.skipped);
     return `<div class="p-head">${closeBtn}
-      <div class="xfer" style="gap:8px">${st.lines.filter(x => !x.skipped).map(x => bdg(x.line, x.num, false, st)).join('')}</div>
+      <div class="xfer" style="gap:8px">${st.lines.filter(x => !x.skipped).map(x => bdg(x.line, x.num)).join('')}</div>
       <div class="p-title">${nm(st)}</div><div class="p-sub">${nm2(st)}${st.lines.filter(x => !x.skipped).length > 1 ? ` · ${st.lines.filter(x => !x.skipped).length} lines` : ''}</div></div>
       <div class="p-body">
         <div class="p-sec">Lines <span class="live" style="margin-left:8px;text-transform:none;letter-spacing:0">simulated</span></div>
