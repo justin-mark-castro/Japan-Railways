@@ -35,13 +35,20 @@
   ].map(([id, en, ja, lat, lon]) => ({ id, en, ja, lat, lon }));
 
   // file: script under js/regions/ that fills TRS_REGIONS_DATA[id]; null = not authored/imported yet
+  const A = id => 'js/regions/auto/' + id + '.js';
   const REGIONS = [
-    { id: 'kanto', en: 'Kanto', ja: '関東', prefs: ['tokyo', 'kanagawa', 'saitama', 'chiba'], file: null, builtin: true },
+    // kanto's hand-authored data is built in (data.js); the rest of each region is the auto-generated import
+    { id: 'kanto', en: 'Kanto', ja: '関東', prefs: ['ibaraki', 'tochigi', 'gunma', 'saitama', 'chiba', 'tokyo', 'kanagawa'], file: null, auto: A('kanto'), builtin: true },
+    // national layers loaded at start-up: Shinkansen (hand-authored) and lines that cross region borders
     { id: 'shinkansen', en: 'Shinkansen', ja: '新幹線', prefs: [], file: 'js/regions/shinkansen.js', national: true },
-    { id: 'chubu', en: 'Chubu', ja: '中部', prefs: ['aichi', 'gifu', 'shizuoka', 'mie', 'nagano', 'yamanashi', 'niigata', 'toyama', 'ishikawa', 'fukui'], file: 'js/regions/chubu.js' },
-    { id: 'tohoku', en: 'Tohoku', ja: '東北', prefs: ['aomori', 'iwate', 'miyagi', 'akita', 'yamagata', 'fukushima'], file: 'js/regions/tohoku.js' },
-    { id: 'kyushu', en: 'Kyushu', ja: '九州', prefs: ['fukuoka', 'saga', 'nagasaki', 'kumamoto', 'oita', 'miyazaki', 'kagoshima', 'okinawa'], file: 'js/regions/kyushu.js' },
-    { id: 'kansai', en: 'Kansai', ja: '関西', prefs: ['osaka', 'kyoto', 'hyogo', 'nara', 'shiga', 'wakayama'], file: 'js/regions/kansai.js' }
+    { id: 'trunk', en: 'Trunk lines', ja: '幹線', prefs: [], auto: A('trunk'), national: true },
+    { id: 'hokkaido', en: 'Hokkaido', ja: '北海道', prefs: ['hokkaido'], auto: A('hokkaido') },
+    { id: 'tohoku', en: 'Tohoku', ja: '東北', prefs: ['aomori', 'iwate', 'miyagi', 'akita', 'yamagata', 'fukushima'], file: 'js/regions/tohoku.js', auto: A('tohoku') },
+    { id: 'chubu', en: 'Chubu', ja: '中部', prefs: ['niigata', 'toyama', 'ishikawa', 'fukui', 'yamanashi', 'nagano', 'gifu', 'shizuoka', 'aichi'], file: 'js/regions/chubu.js', auto: A('chubu') },
+    { id: 'kansai', en: 'Kansai', ja: '関西', prefs: ['mie', 'shiga', 'kyoto', 'osaka', 'hyogo', 'nara', 'wakayama'], file: 'js/regions/kansai.js', auto: A('kansai') },
+    { id: 'chugoku', en: 'Chugoku', ja: '中国', prefs: ['tottori', 'shimane', 'okayama', 'hiroshima', 'yamaguchi'], auto: A('chugoku') },
+    { id: 'shikoku', en: 'Shikoku', ja: '四国', prefs: ['tokushima', 'kagawa', 'ehime', 'kochi'], auto: A('shikoku') },
+    { id: 'kyushu', en: 'Kyushu & Okinawa', ja: '九州・沖縄', prefs: ['fukuoka', 'saga', 'nagasaki', 'kumamoto', 'oita', 'miyazaki', 'kagoshima', 'okinawa'], file: 'js/regions/kyushu.js', auto: A('kyushu') }
   ];
   const prefById = Object.fromEntries(PREFS.map(p => [p.id, p]));
   const regionOfPref = {};

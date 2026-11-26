@@ -11,7 +11,7 @@
   const ALL = { STATION_SRC: TRS_DATA.STATION_SRC, LINE_SRC: TRS_DATA.LINE_SRC.slice() };
   let net, stations, lines, byId;
   function buildNet() {
-    net = TRS.build(ALL, { geometry: geoData && geoData.stations });
+    net = TRS.build(ALL, { geometry: Object.assign({}, window.TRS_GEO_FIX || {}, geoData && geoData.stations) });
     ({ stations, lines, byId } = net);
     Object.values(stations).forEach(st => { st.pref = RG.nearestPref(st.lat, st.lon).id; });
     lines.forEach(L => { L.prefs = new Set(L.ids.map(id => stations[id].pref)); });
@@ -236,12 +236,12 @@
     S.stScreen = [];
     const natl = s < 0.006, margin = 40;
     Object.values(stations).forEach(st => {
+      const x = sx(st.x), y = sy(st.y);
+      if (x < -margin || y < -margin || x > S.W + margin || y > S.H + margin) return;
       let vl = stationVisibleLines(st);
       if (!vl.length) return;
       if (natl && !vl.every(v => v.line.type === 'shin')) return;
       if (S.opts.inter && vl.length < 2) return;
-      const x = sx(st.x), y = sy(st.y);
-      if (x < -margin || y < -margin || x > S.W + margin || y > S.H + margin) return;
       const inFocus = !focus || vl.some(v => v.line === focus);
       const n = vl.length, r = base * (n > 1 ? 1.28 : 0.95) + (n > 3 ? 1 : 0);
       S.stScreen.push({ st, x, y, r, vl, inFocus });
@@ -527,8 +527,8 @@
   }
 
   /* ---------------- sidebar ---------------- */
-  const GRP_COL = { 'JR East': '#9ACD32', 'JR West': '#E8453C', 'Tokyo Metro': '#FF9500', 'Toei Subway': '#6CBB5A', 'Osaka Metro': '#E5171F', 'Private & Others': '#8F76D6', 'Trams': '#E5508F', 'Monorails & AGT': '#2BB3A3', 'Shinkansen': '#4F8DF5' };
-  const GRP_ORDER = ['JR East', 'JR West', 'Tokyo Metro', 'Toei Subway', 'Osaka Metro', 'Private & Others', 'Trams', 'Monorails & AGT', 'Shinkansen'];
+  const GRP_COL = { 'JR East': '#9ACD32', 'JR West': '#E8453C', 'Tokyo Metro': '#FF9500', 'Toei Subway': '#6CBB5A', 'Osaka Metro': '#E5171F', 'Private & Others': '#8F76D6', 'Trams': '#E5508F', 'Monorails & AGT': '#2BB3A3', 'Shinkansen': '#4F8DF5', 'Nagoya Subway': '#0078BE', 'Fukuoka Subway': '#E5171F', 'Sendai Subway': '#00A06A', 'JR Hokkaido': '#2EA043', 'JR Central': '#F28C28', 'JR Shikoku': '#33A7B8', 'JR Kyushu': '#E0402D', 'JR (other)': '#7A8CA0', 'Subways': '#E8A33D', 'Cable cars': '#A58B6A' };
+  const GRP_ORDER = ['Shinkansen', 'JR Hokkaido', 'JR East', 'JR Central', 'JR West', 'JR Shikoku', 'JR Kyushu', 'JR (other)', 'Subways', 'Tokyo Metro', 'Toei Subway', 'Osaka Metro', 'Nagoya Subway', 'Fukuoka Subway', 'Sendai Subway', 'Private & Others', 'Trams', 'Monorails & AGT', 'Cable cars'];
   let OPS = [];
   function computeOps() {
     const seen = []; lines.forEach(L => { if (!seen.includes(L.grp)) seen.push(L.grp); });
@@ -990,7 +990,7 @@
 
   /* ---------------- areas (prefecture under the map centre) + lazy region loading ---------------- */
   const loadedRegions = new Set(RG.REGIONS.filter(r => r.builtin).map(r => r.id)), loadingRegions = new Set();
-  const regionHasData = prefId => { const r = RG.regionOfPref[prefId]; return !!r && (r.builtin || !!r.file); };
+  const regionHasData = prefId => { const r = RG.regionOfPref[prefId]; return !!r && !!(r.builtin || r.file || r.auto); };
   const regionIsLoaded = prefId => { const r = RG.regionOfPref[prefId]; return !!r && loadedRegions.has(r.id); };
   let toastT = 0;
   function toast(msg, ms) { const el = $('toast'); el.textContent = msg; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { el.hidden = true; }, ms || 2400); }
@@ -1008,26 +1008,34 @@
     buildIndex(); buildSidebar(); updateScopeUi();
     if (window.__TRS) window.__TRS.net = net;
   }
+  const loadedParts = new Set(['kanto']);   // 'kanto' = built-in hand-authored Tokyo data
+  const loadScript = src => new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = src; sc.onload = res; sc.onerror = rej; document.head.appendChild(sc); });
   function loadRegion(r) {
-    if (!r || !r.file || loadedRegions.has(r.id) || loadingRegions.has(r.id)) return;
-    loadingRegions.add(r.id); toast('Loading ' + r.en + ' lines…', 6000);
-    const sc = document.createElement('script'); sc.src = r.file;
-    sc.onload = () => {
+    if (!r || loadingRegions.has(r.id)) return;
+    const parts = [r.file && { key: r.id, file: r.file }, r.auto && { key: r.id + '-auto', file: r.auto }].filter(p => p && !loadedParts.has(p.key));
+    if (!parts.length) { loadedRegions.add(r.id); return; }
+    loadingRegions.add(r.id); if (!r.national) toast('Loading ' + r.en + ' lines…', 6000);
+    (async () => {
+      let nLines = 0;
+      try {
+        for (const p of parts) {
+          await loadScript(p.file);
+          const d = (window.TRS_REGIONS_DATA || {})[p.key];
+          if (!d) throw new Error('empty');
+          addRegionData(p.key, d); loadedParts.add(p.key); nLines += d.LINE_SRC.length;
+        }
+        loadedRegions.add(r.id);
+        if (!r.national) toast(r.en + ' loaded: ' + nLines + ' lines');
+      } catch (_) { toast('Could not load ' + r.en + ' data'); }
       loadingRegions.delete(r.id);
-      const d = (window.TRS_REGIONS_DATA || {})[r.id];
-      if (!d) { toast('Region data for ' + r.en + ' is empty'); return; }
-      addRegionData(r.id, d); loadedRegions.add(r.id);
-      toast(r.en + ' loaded: ' + d.LINE_SRC.length + ' lines');
-    };
-    sc.onerror = () => { loadingRegions.delete(r.id); toast('Could not load ' + r.en + ' data'); };
-    document.head.appendChild(sc);
+    })();
   }
   function updateArea() {
     const c = TRS.unproj(S.cam.x, S.cam.y);
     const area = S.cam.s >= 0.0012 ? RG.nearestPref(c.lat, c.lon) : null;
     if ((area && area.id) === (S.area && S.area.id)) return;
     S.area = area;
-    if (area) { const r = RG.regionOfPref[area.id]; if (r && r.file && S.cam.s >= 0.004) loadRegion(r); }
+    if (area) { const r = RG.regionOfPref[area.id]; if (r && (r.file || r.auto) && S.cam.s >= 0.004) loadRegion(r); }
     updateAreaLabel(); refreshScope();
   }
   function updateAreaLabel() { $('areaName').textContent = areaLabel(); }
@@ -1093,7 +1101,7 @@
   try { const th = localStorage.getItem('trs-theme'); if (th) { S.theme = th; document.documentElement.dataset.theme = th; } } catch (_) { }
   resize(); if (S.ui < 0.8) $('q').placeholder = 'Search station, line, spot…';
   fitAll(false); computeOps(); buildIndex(); buildSidebar(); renderPoiChips(); updateArea(); updateAreaLabel();
-  RG.REGIONS.filter(r => r.national).forEach(loadRegion);
+  RG.REGIONS.filter(r => r.national || r.builtin).forEach(loadRegion);
   const q0 = new URLSearchParams(location.search);
   if (q0.get('t')) S.t = clamp(+q0.get('t') * 3600, TRS.SERVICE_START, TRS.SERVICE_END - 1);
   if (q0.get('line') && byId[q0.get('line')]) selectItem('line', q0.get('line'), true);

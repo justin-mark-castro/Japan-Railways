@@ -17,7 +17,7 @@ Open `index.html` (or host on GitHub Pages) — no build step, no dependencies.
 - Time controls: scrub the day, 1×–120×, rush-hour / daytime / last-train presets, "Now" (JST)
 - EN / 日本語, dark / light, mobile friendly
 - **Shinkansen (whole network)**: 14 lines — Nozomi (Tokyo–Hakata), Hikari, Kodama (Tokaido and Sanyo), Mizuho/Sakura, Tsubame, Kamome (Nishi-Kyushu), Hayabusa, Yamabiko, Hokkaido, Joetsu, Hokuriku, and the Akita and Yamagata mini-shinkansen branches. They load at start-up as a national layer, so trains and station names are visible even with the whole of Japan on screen
-- **Beyond Tokyo (phase 1)**: zoom out to see all of Japan with prefecture markers. The dashboard follows the map — the 📍 area chip (top-left) shows the prefecture under the view centre, and the line list, operator chips and train counts are scoped to it ("This area") or to everything loaded ("All loaded"). Click the chip to jump to any of the 47 prefectures. Kansai (Osaka, Kyoto, Kobe, Shiga, Nara, Wakayama) loads on demand as a proof of concept
+- **Beyond Tokyo (phase 1)**: zoom out to see all of Japan with prefecture markers. The dashboard follows the map — the 📍 area chip (top-left) shows the prefecture under the view centre, and the line list, operator chips and train counts are scoped to it ("This area") or to everything loaded ("All loaded"). Click the chip to jump to any of the 47 prefectures. Each region loads on demand when you zoom into it
 
 ## Accuracy — please read
 Everything on the map is **hand-authored and approximate**: line colours, station numbers and coordinates (especially for the added JR and private lines) were entered from memory and the map is schematic. Some Tokyo lines and branches are still missing. By default train movements are **generated** from each line's headway, speed and dwell (rapid services skip stops) — **not** from official timetables. Use the ODPT tools below to replace this with real data.
@@ -54,10 +54,34 @@ Use the same row formats as `js/data.js` / `js/data-extra.js`, give lines a `grp
 
 Caveats: the "area" is the prefecture whose capital is nearest the view centre — an approximation of real borders. The Kansai file is hand-authored, approximate and incomplete (9 lines, ~110 stations); only the Tokyo Bay and Osaka Bay outlines are drawn, there is no national coastline yet; and outside Tokyo trains are simulated. The Shinkansen layer (`js/regions/shinkansen.js`) is the exception: station order and km spacing come from public line articles, journey times are calibrated to published fastest/typical times (e.g. Tokyo–Shin-Osaka 2h21 Nozomi, Tokyo–Shin-Aomori ~3h10), but coordinates are hand-entered (±~1 km), frequencies are rounded headways rather than the real timetable, services that run through between lines (Komachi, Tsubasa, Nasuno, Hayate, Asama, Tsurugi) are not modelled as through trains, and Shinkansen station codes are omitted. The Sapporo extension is not included (under construction). 
 
-Regional files so far: **Kansai** (Osaka Metro + JR loop/Kyoto–Kobe), **Chubu** (Nagoya subway: Higashiyama, Meijo, Meiko, Tsurumai, Sakura-dori), **Kyushu** (Fukuoka subway: Airport and Hakozaki lines) and **Tohoku** (Sendai Subway Namboku). Station lists and numbering come from public line articles, but **coordinates are approximate**: a few anchor stations per line were typed in by hand and the rest are interpolated along the line (±0.5–2 km). Not mapped yet: JR/private lines in these regions, Fukuoka Nanakuma and Sendai Tozai (station tables couldn't be confirmed), trams (Kumamoto, Nagasaki, Kagoshima, Hiroshima, Okayama…), and everything in Hokkaido, Chugoku, Shikoku and Okinawa. A nationwide importer for conventional lines is still planned.
+## Nationwide import (all railways, trams, monorails)
+Every region has two parts: a hand-curated file (`js/regions/<id>.js`, higher quality) and an **auto-generated** file (`js/regions/auto/<id>.js`) built from open data. `js/regions/auto/trunk.js` holds lines that cross region borders and loads at start-up with the Shinkansen layer; Kanto's auto file also loads at start-up, the rest load when you zoom into their prefectures. Currently ~620 lines and ~9,000 stations: JR, private railways, subways, trams (Sapporo, Hakodate, Toyama, Fukui, Kyoto's Randen, Hiroshima, Matsuyama, Kochi, Kumamoto, Nagasaki, Kagoshima, Okinawa's monorail…), monorails, AGT and cable lines.
+
+Regenerate (needs Python 3 and Node, plus two open-data clones):
+```bash
+git clone --depth 1 https://github.com/Seo-4d696b75/station_database /tmp/ext/station_database
+git clone --depth 1 https://github.com/antfu/mlit-json /tmp/ext/mlit-json
+node tools/import/dump-curated.mjs > /tmp/curated.json
+python3 tools/import/build-auto.py --sdb /tmp/ext/station_database --mlit /tmp/ext/mlit-json --curated /tmp/curated.json
+```
+How it merges with the curated data: stations match by normalised Japanese name (within 3 km, or <60 m), curated lines win, and auto lines that duplicate a curated line are dropped or trimmed. `js/regions/fixes.js` (`TRS_GEO_FIX`) snaps hand-typed station coordinates to the accurate open-data positions.
+
+**Limitations (honest list)**
+- **Movements are simulated, not real timetables.** Speed and headway come from the railway type, station spacing and distance to the nearest big city (so a Tokyo-area line runs far more often than a rural one). Use the ODPT tools for real Tokyo data.
+- English names are machine-romanised from kana (e.g. long vowels and some place names will look odd); operator names are shown in Japanese. Line badge codes are the first two characters of the Japanese line name, not official codes.
+- Track shapes are straight lines between stations (MLIT's section polylines are not used yet), so curvy lines look simplified.
+- Curated and auto lines can overlap in central Tokyo, which gets visually busy. Some lines, branches, through-running services and recent openings/closures may be missing or out of date. Sapporo's tram is included; Shinkansen extensions under construction are not.
+- Region detection uses the nearest prefectural capital, not real borders.
+
+## Data sources and attribution
+- Stations, line order, kana and line colours: [station_database](https://github.com/Seo-4d696b75/station_database) by Seo-4d696b75, derived from 駅データ.jp — **CC BY 4.0**.
+- Operator and railway-type data: MLIT 国土数値情報 (National Land Numerical Information) railway data N02, via [antfu/mlit-json](https://github.com/antfu/mlit-json) — follow the MLIT terms of use and credit "国土交通省 国土数値情報".
+- Optional real timetables: [Public Transportation Open Data Center (ODPT)](https://www.odpt.org/) — follow each dataset's licence.
 
 ## Structure
 - `js/regions/shinkansen.js` – national Shinkansen layer (loads at start-up)
+- `js/regions/auto/`, `js/regions/fixes.js` – generated nationwide data (see *Nationwide import*)
+- `tools/import/` – open-data importer (`build-auto.py`, `dump-curated.mjs`)
 - `js/regions.js`, `js/regions/` – prefectures, region loader and lazy region data
 - `js/data.js`, `js/data-extra.js` – stations, lines, colours, codes, frequencies
 - `js/station-badge.js` – station-number badges in Japanese signage style (JR rounded square, ring for Metro/Toei/private); SVG for the UI, canvas for map labels

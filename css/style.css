@@ -284,3 +284,6 @@ kbd{font-size:11px;border:1px solid var(--line);border-radius:6px;padding:1px 6p
 
 .sym.shin{clip-path:polygon(10% 0,100% 0,90% 100%,0 100%);min-width:34px;padding:0 9px;border-radius:0;letter-spacing:.02em}
 .sym.shin.sm{min-width:28px}
+.legend-note a{color:inherit;text-decoration:underline;pointer-events:auto}
+.about{font-size:11.5px;line-height:1.5;color:var(--muted);margin:6px 2px 2px}
+.about a{color:var(--accent,inherit)}

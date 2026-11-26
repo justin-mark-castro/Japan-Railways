@@ -66,6 +66,10 @@
         <label class="tog"><input type="checkbox" id="optPoi" checked><span>Show on map</span></label>
         <div id="poiChips" class="chips" style="margin:6px 0 0"></div>
       </details>
+      <details class="sec" id="secAbout">
+        <summary>About &amp; data sources</summary>
+        <p class="about">Stations, line order and colours outside the hand-made Tokyo/Shinkansen data come from open data: <a href="https://github.com/Seo-4d696b75/station_database" target="_blank" rel="noopener">station_database</a> (駅データ.jp, CC BY 4.0) and MLIT <a href="https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-N02-v3_1.html" target="_blank" rel="noopener">国土数値情報 N02</a>; optional real timetables from <a href="https://www.odpt.org/" target="_blank" rel="noopener">ODPT</a>. Train movements are <b>simulated</b> (not official timetables), English names are machine-romanised, and track shapes are straight station-to-station lines.</p>
+      </details>
     </div>
   </aside>
 
@@ -88,7 +92,7 @@
       <button id="zout" class="icon-btn" aria-label="Zoom out">−</button>
       <button id="zfit" class="icon-btn" aria-label="Reset view" title="Reset view">⌖</button>
     </div>
-    <div class="legend-note">Schematic map · positions approximate · timetable is simulated from line frequency &amp; speed, not official data</div>
+    <div class="legend-note">Schematic map · positions approximate · timetable is simulated from line frequency &amp; speed, not official data · Station &amp; line data: <a href="https://github.com/Seo-4d696b75/station_database" target="_blank" rel="noopener">駅データ.jp / station_database</a> (CC BY 4.0), <a href="https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-N02-v3_1.html" target="_blank" rel="noopener">MLIT 国土数値情報</a>, <a href="https://www.odpt.org/" target="_blank" rel="noopener">ODPT</a></div>
   </main>
 
   <aside id="panel" hidden></aside>
@@ -106,6 +110,7 @@
 <script src="js/data-extra.js"></script>
 <script src="js/poi.js"></script>
 <script src="js/regions.js"></script>
+<script src="js/regions/fixes.js"></script>
 <script src="js/station-badge.js"></script>
 <script src="js/sim.js"></script>
 <script src="js/app.js"></script>
