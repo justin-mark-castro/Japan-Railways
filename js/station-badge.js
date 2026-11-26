@@ -58,10 +58,10 @@
       ctx.lineWidth = s * .12; ctx.strokeStyle = L.color; ctx.stroke();
     }
     ctx.fillStyle = INK; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    const len = L.code.length, k = len <= 1 ? .3 : len === 2 ? .25 : .19;
+    const len = L.code.length, k = len <= 1 ? .36 : len === 2 ? .3 : .23;
     if (hasNum) {
-      ctx.font = `700 ${s * k}px ${fn}`; ctx.fillText(L.code, cx, cy - s * .14);
-      ctx.font = `800 ${s * .3}px ${fn}`; ctx.fillText(pad2(num), cx, cy + s * .15);
+      ctx.font = `700 ${s * k}px ${fn}`; ctx.fillText(L.code, cx, cy - s * .16);
+      ctx.font = `800 ${s * .38}px ${fn}`; ctx.fillText(pad2(num), cx, cy + s * .17);
     } else {
       ctx.font = `800 ${s * (k + .12)}px ${fn}`; ctx.fillText(L.code, cx, cy + s * .02);
     }

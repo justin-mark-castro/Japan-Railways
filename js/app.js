@@ -290,11 +290,16 @@
         const vl = focus ? o.vl.filter(v => v.line === focus) : o.vl;
         badges = vl.map(v => ({ v, label: v.line.label(v.idx) }));
       }
-      const BS = 22 * u;                       // station-number badge size (square)
-      const bw = badges.map(() => BS);
-      const rowW = bw.reduce((a, b) => a + b + 3, 0);
+      // badges sit beside the name, before it: [badge grid][name / local name]
+      const BS = 32 * u, BG = 3 * u;           // station-number badge size (square) and gap
       const showSub = s >= 0.3;
-      const blockW = Math.max(tw, rowW), blockH = fs + 3 + (showSub ? 12 * u : 0) + (badges.length ? BS + 3 * u : 0);
+      let subW = 0;
+      if (showSub) { ctx.font = `500 ${10.5 * u}px ${FN}`; subW = ctx.measureText(nm2(o.st)).width; }
+      const textW = Math.max(tw, subW), textH = fs + 3 + (showSub ? 12 * u : 0);
+      const bCols = Math.min(badges.length, 4), bRows = Math.ceil(badges.length / (bCols || 1));
+      const bW = badges.length ? bCols * (BS + BG) - BG : 0, bH = badges.length ? bRows * (BS + BG) - BG : 0;
+      const tgap = badges.length ? 7 * u : 0;
+      const blockW = bW + tgap + textW, blockH = Math.max(textH, bH);
       const gap = o.r + 5 * u;
       const cand = [
         { x: o.x + gap, y: o.y - blockH / 2, a: 'l' }, { x: o.x - gap - blockW, y: o.y - blockH / 2, a: 'r' },
@@ -307,26 +312,20 @@
       const { k } = pick;
       const dim = focus && !o.inFocus;
       ctx.globalAlpha = dim ? 0.3 : 1;
-      const alignX = k.a === 'r' ? k.x + blockW : k.a === 'c' ? k.x + blockW / 2 : k.x;
-      ctx.textAlign = k.a === 'r' ? 'right' : k.a === 'c' ? 'center' : 'left';
+      ctx.textAlign = 'left';
+      const tx = k.x + bW + tgap, ty = k.y + (blockH - textH) / 2 + fs;
       ctx.font = `600 ${fs}px Inter, "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif`;
-      const ty = k.y + fs;
-      ctx.lineWidth = 3.5 * u; ctx.strokeStyle = c.halo; ctx.lineJoin = 'round'; ctx.strokeText(text, alignX, ty);
-      ctx.fillStyle = c.label; ctx.fillText(text, alignX, ty);
-      let yy = ty;
+      ctx.lineWidth = 3.5 * u; ctx.strokeStyle = c.halo; ctx.lineJoin = 'round'; ctx.strokeText(text, tx, ty);
+      ctx.fillStyle = c.label; ctx.fillText(text, tx, ty);
       if (showSub) {
+        const yy = ty + 12 * u;
         ctx.font = `500 ${10.5 * u}px ${FN}`;
-        yy += 12 * u; ctx.lineWidth = 3; ctx.strokeText(nm2(o.st), alignX, yy); ctx.fillStyle = c.sub; ctx.fillText(nm2(o.st), alignX, yy);
+        ctx.lineWidth = 3; ctx.strokeText(nm2(o.st), tx, yy); ctx.fillStyle = c.sub; ctx.fillText(nm2(o.st), tx, yy);
       }
-      if (badges.length) {
-        yy += 5 * u;
-        let bx = k.a === 'r' ? k.x + blockW - rowW + 3 : k.a === 'c' ? k.x + blockW / 2 - rowW / 2 : k.x;
-        badges.forEach((b, i) => {
-          const L = b.v.line;
-          StationBadge.draw(ctx, L, b.label.slice(L.code.length), bx, yy, bw[i]);
-          bx += bw[i] + 3;
-        });
-      }
+      badges.forEach((b, i) => {
+        const L = b.v.line, col = i % bCols, row = Math.floor(i / bCols);
+        StationBadge.draw(ctx, L, b.label.slice(L.code.length), k.x + col * (BS + BG), k.y + (blockH - bH) / 2 + row * (BS + BG), BS);
+      });
       ctx.globalAlpha = 1;
     }
     ctx.textAlign = 'left';
