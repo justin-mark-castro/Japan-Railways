@@ -266,3 +266,19 @@ kbd{font-size:11px;border:1px solid var(--line);border-radius:6px;padding:1px 6p
 .sym.tram.sm{min-width:24px}
 .sym.mono{clip-path:polygon(12% 0,88% 0,100% 50%,88% 100%,12% 100%,0 50%);min-width:32px;padding:0 8px;border-radius:0}
 .sym.mono.sm{min-width:26px}
+
+/* areas, scope toggle, toast */
+.seg{display:flex;margin-top:8px;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+.seg button{flex:1;height:28px;border:0;background:var(--panel2);color:var(--muted);font-size:12px;cursor:pointer}
+.seg button.on{background:var(--accent);color:#0b1520;font-weight:700}
+.linkbtn{margin-top:8px;border:1px solid var(--line);background:var(--panel2);color:var(--text);border-radius:8px;padding:5px 10px;font-size:12px;cursor:pointer}
+.amenu{left:14px;top:52px;width:300px;max-height:min(60%,420px);padding:8px}
+.amenu input{width:100%;height:32px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);padding:0 10px;outline:none;margin-bottom:6px}
+.amenu input:focus{border-color:var(--accent)}
+.amlist{overflow:auto;scrollbar-width:thin}
+.amrow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;cursor:pointer;font-size:13px}
+.amrow:hover,.amrow.cur{background:var(--panel2)}
+.amrow small{color:var(--muted)}.amrow em{font-style:normal;font-size:11px;color:var(--accent)}
+.amrow.nodata{opacity:.55}.amrow.nodata em{color:var(--muted)}
+.toast{position:absolute;left:50%;bottom:64px;transform:translateX(-50%);background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:7px 16px;font-size:12.5px;box-shadow:var(--shadow);z-index:30;pointer-events:none}
+.toast[hidden]{display:none}

@@ -16,6 +16,7 @@ Open `index.html` (or host on GitHub Pages) — no build step, no dependencies.
 - Click a station for interchanges + departure board; a line for stats; a train for route and ETAs
 - Time controls: scrub the day, 1×–120×, rush-hour / daytime / last-train presets, "Now" (JST)
 - EN / 日本語, dark / light, mobile friendly
+- **Beyond Tokyo (phase 1)**: zoom out to see all of Japan with prefecture markers. The dashboard follows the map — the 📍 area chip (top-left) shows the prefecture under the view centre, and the line list, operator chips and train counts are scoped to it ("This area") or to everything loaded ("All loaded"). Click the chip to jump to any of the 47 prefectures. Kansai (Osaka, Kyoto, Kobe, Shiga, Nara, Wakayama) loads on demand as a proof of concept
 
 ## Accuracy — please read
 Everything on the map is **hand-authored and approximate**: line colours, station numbers and coordinates (especially for the added JR and private lines) were entered from memory and the map is schematic. Some Tokyo lines and branches are still missing. By default train movements are **generated** from each line's headway, speed and dwell (rapid services skip stops) — **not** from official timetables. Use the ODPT tools below to replace this with real data.
@@ -40,7 +41,20 @@ Reload the site: a **Timetable** section appears in the sidebar (Simulated / Wee
 
 **Attribution:** if you publish generated data, credit "Public Transportation Open Data Center (ODPT)" and follow the licence of each dataset.
 
+## Regions (whole-of-Japan architecture)
+The map uses a Mercator projection (metres around Tokyo), so it scales from a single station out to the whole country. `js/regions.js` lists the 47 prefectures and the regions; Kanto is built in, other regions are lazy-loaded scripts in `js/regions/`. A region loads automatically when you zoom in on one of its prefectures.
+
+To add a region, create `js/regions/<id>.js` and add `{id, file, prefs:[…]}` to `REGIONS` in `js/regions.js`:
+```js
+window.TRS_REGIONS_DATA = window.TRS_REGIONS_DATA || {};
+TRS_REGIONS_DATA.kansai = { STATION_SRC: [...], LINE_SRC: [...], POIS: [...], WATER: [...] };
+```
+Use the same row formats as `js/data.js` / `js/data-extra.js`, give lines a `grp` (operator group), and keep station ids unique across regions (Kansai prefixes clashing ids with `o`).
+
+Caveats: the "area" is the prefecture whose capital is nearest the view centre — an approximation of real borders. The Kansai file is hand-authored, approximate and incomplete (9 lines, ~110 stations); only the Tokyo Bay and Osaka Bay outlines are drawn, there is no national coastline yet; and outside Tokyo trains are simulated. Shinkansen and a nationwide data importer are planned next.
+
 ## Structure
+- `js/regions.js`, `js/regions/` – prefectures, region loader and lazy region data
 - `js/data.js`, `js/data-extra.js` – stations, lines, colours, codes, frequencies
 - `js/poi.js` – tourist spots
 - `js/sim.js` – network builder + stateless schedule engine (simulated or real trips)

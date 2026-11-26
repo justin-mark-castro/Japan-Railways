@@ -7,8 +7,16 @@
   const manifest = (await loadJSON('data/manifest.json')) || {};
   const geoData = manifest.geometry ? await loadJSON('data/geometry.json') : null;
   const ttData = manifest.timetable ? await loadJSON('data/timetable.json') : null;
-  const net = TRS.build(TRS_DATA, { geometry: geoData && geoData.stations });
-  const { stations, lines, byId } = net;
+  const RG = TRS_REGIONS;
+  const ALL = { STATION_SRC: TRS_DATA.STATION_SRC, LINE_SRC: TRS_DATA.LINE_SRC.slice() };
+  let net, stations, lines, byId;
+  function buildNet() {
+    net = TRS.build(ALL, { geometry: geoData && geoData.stations });
+    ({ stations, lines, byId } = net);
+    Object.values(stations).forEach(st => { st.pref = RG.nearestPref(st.lat, st.lon).id; });
+    lines.forEach(L => { L.prefs = new Set(L.ids.map(id => stations[id].pref)); });
+  }
+  buildNet();
   const $ = id => document.getElementById(id);
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const lerp = (a, b, t) => a + (b - a) * t;
@@ -20,11 +28,11 @@
     sel: null,            // {type:'station'|'line'|'train', id}
     follow: null,
     opts: { trains: true, names: true, badges: true, inter: false, water: true, poi: true },
-    poiCats: {}, dataMode: 'sim', countsOpen: false,
+    poiCats: {}, dataMode: 'sim', countsOpen: false, area: null, scope: 'area',
     cam: { x: -2600, y: 500, s: 0.06 }, W: 800, H: 600, dpr: 1, ui: 1,
     anim: null, trains: [], trainIdx: {}, stScreen: [], hover: null, dragging: false
   };
-  const MIN_S = 0.012, MAX_S = 2.4;
+  const MIN_S = 0.0004, MAX_S = 2.4;
 
   /* ---------------- helpers ---------------- */
   const nm = o => (S.lang === 'ja' ? o.ja : o.en);
@@ -41,16 +49,20 @@
   const normQ = s => s.toLowerCase().replace(/[\s\-・'’.,]/g, '');
 
   /* ---------------- tourist spots ---------------- */
-  const POI = TRS_POI.POIS, POI_CATS = TRS_POI.CATS, poiById = {};
+  const POI = TRS_POI.POIS.slice(), POI_CATS = TRS_POI.CATS, poiById = {};
   S.poiHidden = new Set();
-  POI.forEach(p => {
-    const q = TRS.proj(p.lat, p.lon); p.x = q.x; p.y = q.y; poiById[p.id] = p;
-    p.near = Object.values(stations).map(st => ({ st, d: Math.hypot(st.x - p.x, st.y - p.y) }))
-      .filter(o => o.st.lines.some(x => !x.skipped)).sort((a, b) => a.d - b.d)
-      .filter(o => o.d < 1600).slice(0, 3)
-      .map(o => ({ st: o.st, d: o.d, walk: Math.max(1, Math.round(o.d * 1.3 / 80)) }));
-    if (!p.near.length) { const o = Object.values(stations).map(st => ({ st, d: Math.hypot(st.x - p.x, st.y - p.y) })).sort((a, b) => a.d - b.d)[0]; p.near = [{ st: o.st, d: o.d, walk: Math.round(o.d * 1.3 / 80) }]; }
-  });
+  function prepPois() {
+    const sts = Object.values(stations);
+    POI.forEach(p => {
+      const q = TRS.proj(p.lat, p.lon); p.x = q.x; p.y = q.y; poiById[p.id] = p;
+      const cand = sts.filter(st => Math.abs(st.x - p.x) < 60000 && Math.abs(st.y - p.y) < 60000 && st.lines.some(x => !x.skipped))
+        .map(st => ({ st, d: Math.hypot(st.x - p.x, st.y - p.y) })).sort((x, y) => x.d - y.d);
+      const mk = o => ({ st: o.st, d: o.d, walk: Math.max(1, Math.round(o.d * 1.3 / 80)) });
+      p.near = cand.filter(o => o.d < 1600).slice(0, 3).map(mk);
+      if (!p.near.length && cand.length) p.near = [mk(cand[0])];
+    });
+  }
+  prepPois();
 
   /* ---------------- canvas ---------------- */
   const cv = $('map'), ctx = cv.getContext('2d');
@@ -126,6 +138,11 @@
 
   /* ---------------- visibility ---------------- */
   const isVisible = L => !S.hidden.has(L.id);
+  function inView(L) {
+    const b = L.bbox, m = 80 / S.cam.s;
+    return b.x1 > wx(0) - m && b.x0 < wx(S.W) + m && b.y1 > wy(0) - m && b.y0 < wy(S.H) + m;
+  }
+  const drawn = L => isVisible(L) && (inView(L) || L === selectedLine());
   function selectedLine() {
     if (!S.sel) return null;
     if (S.sel.type === 'line') return byId[S.sel.id];
@@ -148,9 +165,8 @@
     ctx.fillStyle = c.park;
     PARKS.forEach(p => { ctx.beginPath(); ctx.ellipse(sx(p.x), sy(p.y), p.rx * S.cam.s, p.ry * S.cam.s, 0, 0, 7); ctx.fill(); });
     // bay
-    ctx.fillStyle = c.water; ctx.beginPath();
-    WATER_PTS.forEach((p, i) => (i ? ctx.lineTo(sx(p.x), sy(p.y)) : ctx.moveTo(sx(p.x), sy(p.y))));
-    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = c.water;
+    WATER_POLYS.forEach(poly => { ctx.beginPath(); poly.forEach((p, i) => (i ? ctx.lineTo(sx(p.x), sy(p.y)) : ctx.moveTo(sx(p.x), sy(p.y)))); ctx.closePath(); ctx.fill(); });
     ctx.fillStyle = c.bg;
     LAND_PTS.forEach(poly => { ctx.beginPath(); poly.forEach((p, i) => (i ? ctx.lineTo(sx(p.x), sy(p.y)) : ctx.moveTo(sx(p.x), sy(p.y)))); ctx.closePath(); ctx.fill(); });
     ctx.strokeStyle = c.river; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
@@ -165,18 +181,18 @@
     { lat: 35.6676, lon: 139.7195, rx: 480, ry: 320 }, { lat: 35.6485, lon: 139.7140, rx: 380, ry: 260 }
   ].map(p => Object.assign(p, TRS.proj(p.lat, p.lon)));
   const LAND_PTS = (TRS_DATA.LAND || []).map(poly => poly.map(p => TRS.proj(p[0], p[1])));
-  const WATER_PTS = TRS_DATA.WATER.map(p => TRS.proj(p[0], p[1]));
+  const WATER_POLYS = [TRS_DATA.WATER.map(p => TRS.proj(p[0], p[1]))];
   const RIVER_PTS = TRS_DATA.RIVERS.map(r => ({ w: r.w, pts: r.pts.map(p => TRS.proj(p[0], p[1])) }));
 
   let lineSS = {};
   function drawLines() {
     const c = T(), s = S.cam.s;
-    const u = S.ui, w = clamp(1.6 + 38 * s, 2.4, 8.5) * u, spacing = w + 1.2 * u;
+    const u = S.ui, w = clamp(1.6 + 38 * s, s < 0.01 ? 1.1 : 2.4, 8.5) * u, spacing = w + 1.2 * u;
     const focus = selectedLine();
     ctx.lineJoin = 'round'; ctx.lineCap = 'round';
     lineSS = {};
     // draw subways first, JR on top
-    const order = lines.filter(isVisible).sort((a, b) => (a.type === 'jr') - (b.type === 'jr'));
+    const order = lines.filter(drawn).sort((a, b) => (a.type === 'jr') - (b.type === 'jr'));
     order.forEach(L => {
       const ss = lineSS[L.id] = lineScreen(L, spacing);
       const lw = L.type === 'jr' ? w * 1.12 : w * 0.92;
@@ -214,6 +230,7 @@
     const c = T(), s = S.cam.s, focus = selectedLine();
     const base = clamp(1.6 + 16 * s, 2.4, 7.5) * S.ui;
     S.stScreen = [];
+    if (s < 0.006) return;
     const margin = 40;
     Object.values(stations).forEach(st => {
       let vl = stationVisibleLines(st);
@@ -321,7 +338,7 @@
 
   function updateTrains() {
     const arr = [];
-    lines.forEach(L => { if (isVisible(L)) TRS.activeTrips(L, S.t, arr); });
+    lines.forEach(L => { if (drawn(L)) TRS.activeTrips(L, S.t, arr); });
     S.trains = arr; S.trainIdx = {};
     arr.forEach(t => { S.trainIdx[t.key] = t; });
   }
@@ -334,7 +351,7 @@
   }
   function drawTrains() {
     S.trainScreen = [];
-    if (!S.opts.trains) return;
+    if (!S.opts.trains || S.cam.s < 0.006) return;
     const s = S.cam.s, focus = selectedLine(), c = T();
     const R = clamp(0.6 + 72 * s, 3.6, 12.5) * S.ui;
     S.trains.forEach(t => {
@@ -422,6 +439,8 @@
 
   function drawPois() {
     S.poiScreen = [];
+    if (S.cam.s < 0.012) return;
+    S.poiScreen = [];
     if (!S.opts.poi) return;
     const c = T(), s = S.cam.s, Rp = clamp(8 + 22 * s, 9, 16) * S.ui;
     const selId = S.sel && S.sel.type === 'poi' ? S.sel.id : null;
@@ -477,6 +496,7 @@
     const w = drawLines();
     drawStations(w);
     drawPois();
+    drawPrefs();
     drawTrains();
     drawLabels();
     uiTick(now);
@@ -493,7 +513,8 @@
     $('clockSec').textContent = ':' + pad2(Math.floor(tt) % 60);
     if (document.activeElement !== $('scrub') || !scrubbing) $('scrub').value = Math.round(S.t);
     if (now - lastUi < 250) return; lastUi = now;
-    const n = S.trains.length;
+    updateArea();
+    const n = S.trains.filter(t => inScope(t.line)).length;
     $('hudTrains').textContent = n + (n === 1 ? ' train running' : ' trains running');
     $('hudPeriod').textContent = (S.dataMode === 'sim' ? TRS.PERIOD_LABEL[TRS.periodOf(S.t)] : 'Real timetable · ' + S.dataMode) + (n === 0 ? ' · out of service' : '');
     // line counts
@@ -504,9 +525,24 @@
   }
 
   /* ---------------- sidebar ---------------- */
-  const OPS = [['JR East', '#9ACD32'], ['Tokyo Metro', '#FF9500'], ['Toei Subway', '#6CBB5A'], ['Private & Others', '#8F76D6'], ['Trams', '#E5508F'], ['Monorails & AGT', '#2BB3A3']];
+  const GRP_COL = { 'JR East': '#9ACD32', 'JR West': '#E8453C', 'Tokyo Metro': '#FF9500', 'Toei Subway': '#6CBB5A', 'Osaka Metro': '#E5171F', 'Private & Others': '#8F76D6', 'Trams': '#E5508F', 'Monorails & AGT': '#2BB3A3' };
+  const GRP_ORDER = ['JR East', 'JR West', 'Tokyo Metro', 'Toei Subway', 'Osaka Metro', 'Private & Others', 'Trams', 'Monorails & AGT'];
+  let OPS = [];
+  function computeOps() {
+    const seen = []; lines.forEach(L => { if (!seen.includes(L.grp)) seen.push(L.grp); });
+    const rank = g => { const i = GRP_ORDER.indexOf(g); return i < 0 ? 99 : i; };
+    seen.sort((x, y) => rank(x) - rank(y));
+    OPS = seen.map(g => [g, GRP_COL[g] || '#8aa0b4']);
+    OPS.forEach(([g]) => { if (!(g in S.ops)) S.ops[g] = true; });
+  }
+  const inScope = L => S.scope === 'all' || !S.area || L.prefs.has(S.area.id);
+  const areaLabel = () => (S.area ? (S.lang === 'ja' ? S.area.ja : S.area.en) : (S.lang === 'ja' ? '日本' : 'Japan'));
+  function renderOpChips() {
+    const ops = OPS.filter(([op]) => lines.some(L => L.grp === op && inScope(L)));
+    $('opChips').innerHTML = ops.map(([op, col]) => `<button class="chip ${S.ops[op] ? 'on' : ''}" data-op="${op}"><i style="background:${col}"></i>${op}</button>`).join('');
+  }
   function buildSidebar() {
-    $('opChips').innerHTML = OPS.map(([op, col]) => `<button class="chip ${S.ops[op] ? 'on' : ''}" data-op="${op}"><i style="background:${col}"></i>${op}</button>`).join('');
+    renderOpChips();
     $('opChips').onclick = e => {
       const b = e.target.closest('.chip'); if (!b) return;
       const op = b.dataset.op; S.ops[op] = !S.ops[op];
@@ -528,7 +564,7 @@
     const f = normQ($('lineFilter').value || '');
     let html = '';
     OPS.forEach(([op]) => {
-      const ls = lines.filter(L => L.grp === op && (!f || normQ(L.en + L.ja + L.code + L.op + L.id).includes(f)));
+      const ls = lines.filter(L => L.grp === op && inScope(L) && (!f || normQ(L.en + L.ja + L.code + L.op + L.id).includes(f)));
       if (!ls.length) return;
       html += `<div class="grp">${op}</div>`;
       ls.forEach(L => {
@@ -539,9 +575,15 @@
           <span class="cnt" data-l="${L.id}" title="trains running">0</span></div>`;
       });
     });
-    $('lineList').innerHTML = html || '<div class="empty-note" style="padding:14px">No matching lines.</div>';
+    if (!html) {
+      const noData = S.area && !f && !lines.some(L => L.prefs.has(S.area.id));
+      html = noData ? `<div class="empty-note" style="padding:14px">No line data for <b>${areaLabel()}</b> yet.<br>Add a region file or run the nationwide import (see README).<br><button class="linkbtn" data-scope="all">Show all loaded lines</button></div>` : '<div class="empty-note" style="padding:14px">No matching lines.</div>';
+    }
+    $('lineList').innerHTML = html;
+    updateScopeUi();
   }
   $('lineList').addEventListener('click', e => {
+    const sc = e.target.closest('[data-scope]'); if (sc) { S.scope = sc.dataset.scope; refreshScope(); return; }
     const eye = e.target.closest('[data-eye]');
     if (eye) { toggleLine(eye.dataset.eye); e.stopPropagation(); return; }
     const row = e.target.closest('.lrow'); if (!row) return;
@@ -554,7 +596,7 @@
   }
   function syncSidebar() {
     OPS.forEach(([op]) => { S.ops[op] = lines.some(L => L.grp === op && !S.hidden.has(L.id)); });
-    $('opChips').querySelectorAll('.chip').forEach(c => c.classList.toggle('on', S.ops[c.dataset.op]));
+    renderOpChips();
     renderLineList();
   }
 
@@ -703,13 +745,17 @@
   });
 
   /* ---------------- search ---------------- */
-  const index = [];
-  Object.values(stations).forEach(st => {
-    const codes = st.lines.filter(x => !x.skipped).map(x => normQ(x.line.label(x.idx)));
-    index.push({ type: 'station', id: st.id, en: normQ(st.en), ja: st.ja, codes, st });
-  });
-  POI.forEach(p => index.push({ type: 'spot', id: p.id, en: normQ(p.en), ja: p.ja, codes: [], p }));
-  lines.forEach(L => index.push({ type: 'line', id: L.id, en: normQ(L.en), ja: L.ja, codes: [normQ(L.code), normQ(L.id)], L }));
+  let index = [];
+  function buildIndex() {
+    index = [];
+    Object.values(stations).forEach(st => {
+      const codes = st.lines.filter(x => !x.skipped).map(x => normQ(x.line.label(x.idx)));
+      index.push({ type: 'station', id: st.id, en: normQ(st.en), ja: st.ja, codes, st });
+    });
+    POI.forEach(p => index.push({ type: 'spot', id: p.id, en: normQ(p.en), ja: p.ja, codes: [], p }));
+    lines.forEach(L => index.push({ type: 'line', id: L.id, en: normQ(L.en), ja: L.ja, codes: [normQ(L.code), normQ(L.id)], L }));
+    RG.PREFS.forEach(pf => index.push({ type: 'pref', id: pf.id, en: normQ(pf.en), ja: pf.ja, codes: [], pf }));
+  }
   let resItems = [], resSel = 0;
   function runSearch(q) {
     const nq = normQ(q); if (!nq) return [];
@@ -743,6 +789,10 @@
         return `<div class="res ${i === resSel ? 'sel' : ''}" data-i="${i}"><span class="poi-ic" style="--c:${POI_CATS[p.cat].color}">${p.emoji}</span>
           <div class="t"><b>${nm(p)}</b><small>${nm2(p)}</small></div><span class="kind">spot</span></div>`;
       }
+      if (it.type === 'pref') {
+        return `<div class="res ${i === resSel ? 'sel' : ''}" data-i="${i}"><span class="poi-ic" style="--c:#7cc4ff">📍</span>
+          <div class="t"><b>${nm(it.pf)}</b><small>${nm2(it.pf)} · ${regionHasData(it.pf.id) ? 'line data available' : 'no line data yet'}</small></div><span class="kind">area</span></div>`;
+      }
       const L = it.L;
       return `<div class="res ${i === resSel ? 'sel' : ''}" data-i="${i}">${bdg(L)}<div class="t"><b>${nm(L)}</b><small>${nm2(L)} · ${L.op}</small></div><span class="kind">line</span></div>`;
     }).join('');
@@ -750,6 +800,7 @@
   function pickResult(i) {
     const it = resItems[i]; if (!it) return;
     $('results').hidden = true; $('q').blur();
+    if (it.type === 'pref') { flyToPref(it.id); return; }
     selectItem(it.type === 'spot' ? 'poi' : it.type, it.id, true);
   }
   $('q').addEventListener('input', () => { resItems = runSearch($('q').value); resSel = 0; renderResults(); });
@@ -816,6 +867,8 @@
     S.stScreen.forEach(o => { const d = Math.hypot(o.x - px, o.y - py); if (d < Math.max(o.r + 5, 11) && d < bd) { bd = d; best = { type: 'station', o }; } });
     if (best) return best;
     (S.poiScreen || []).forEach(o => { const d = Math.hypot(o.x - px, o.y - py); if (d < o.r + 4 && d < bd) { bd = d; best = { type: 'poi', o }; } });
+    if (best) return best;
+    (S.prefScreen || []).forEach(o => { const d = Math.hypot(o.x - px, o.y - py); if (d < 14 && d < bd) { bd = d; best = { type: 'pref', o }; } });
     return best;
   }
   function clickAt(px, py) {
@@ -823,6 +876,7 @@
     if (!h) { clearSel(); return; }
     if (h.type === 'train') { selectItem('train', h.t.key, false); }
     else if (h.type === 'poi') selectItem('poi', h.o.p.id, false);
+    else if (h.type === 'pref') flyToPref(h.o.p.id);
     else selectItem('station', h.o.st.id, false);
   }
   function hoverAt(px, py, e) {
@@ -836,6 +890,9 @@
       const stn = stations[L.ids[tpl.stops[Math.min(k, tpl.stops.length - 1)] % L.n]];
       html = `<div class="row">${bdg(L)}</div><b>${L.loop ? TRS.destName(L, t.dir, stations, S.lang) : (S.lang === 'ja' ? TRS.destName(L, t.dir, stations, 'ja', tpl) + ' 行き' : 'To ' + TRS.destName(L, t.dir, stations, 'en', tpl))}</b>
         <span style="color:var(--muted)">${t.dwell ? 'Stopped at' : 'Next:'} ${nm(stn)}</span>`;
+    } else if (h.type === 'pref') {
+      const p = h.o.p;
+      html = `<b>📍 ${nm(p)}</b><span style="color:var(--muted)">${nm2(p)} · ${regionHasData(p.id) ? 'click to zoom in' : 'no line data yet'}</span>`;
     } else if (h.type === 'poi') {
       const p = h.o.p;
       html = `<b>${p.emoji} ${nm(p)}</b><span style="color:var(--muted)">${nm2(p)} · ${POI_CATS[p.cat][S.lang]}</span>`;
@@ -871,7 +928,7 @@
   ['Trains', 'Names', 'Badges', 'Inter', 'Water', 'Poi'].forEach(k => {
     $('opt' + k).addEventListener('change', e => { S.opts[k.toLowerCase()] = e.target.checked; });
   });
-  $('langBtn').onclick = () => { renderPoiChips();  S.lang = S.lang === 'en' ? 'ja' : 'en'; $('langBtn').textContent = S.lang === 'en' ? 'EN' : '日本語'; document.documentElement.lang = S.lang; renderLineList(); renderPanel(false); };
+  $('langBtn').onclick = () => { renderPoiChips(); updateAreaLabel();  S.lang = S.lang === 'en' ? 'ja' : 'en'; $('langBtn').textContent = S.lang === 'en' ? 'EN' : '日本語'; document.documentElement.lang = S.lang; renderLineList(); renderPanel(false); };
   $('themeBtn').onclick = () => { S.theme = S.theme === 'dark' ? 'light' : 'dark'; document.documentElement.dataset.theme = S.theme; try { localStorage.setItem('trs-theme', S.theme); } catch (_) { } };
   $('menuBtn').onclick = () => { document.body.classList.toggle('menu'); $('scrim').hidden = !document.body.classList.contains('menu'); };
   $('scrim').onclick = () => { document.body.classList.remove('menu'); $('scrim').hidden = true; };
@@ -895,12 +952,14 @@
     $('btnCounts').classList.toggle('on', S.countsOpen);
     if (!S.countsOpen) return;
     const cnt = {}, inner = {};
-    S.trains.forEach(t => { cnt[t.line.id] = (cnt[t.line.id] || 0) + 1; if (t.dir === 0) inner[t.line.id] = (inner[t.line.id] || 0) + 1; });
-    const grp = {}; S.trains.forEach(t => { grp[t.line.grp] = (grp[t.line.grp] || 0) + 1; });
-    const rows = lines.slice().sort((a, b) => (cnt[b.id] || 0) - (cnt[a.id] || 0) || a.order - b.order);
+    const trains = S.trains.filter(t => inScope(t.line));
+    trains.forEach(t => { cnt[t.line.id] = (cnt[t.line.id] || 0) + 1; if (t.dir === 0) inner[t.line.id] = (inner[t.line.id] || 0) + 1; });
+    const grp = {}; trains.forEach(t => { grp[t.line.grp] = (grp[t.line.grp] || 0) + 1; });
+    const rows = lines.filter(inScope).sort((a, b) => (cnt[b.id] || 0) - (cnt[a.id] || 0) || a.order - b.order);
     const max = Math.max(1, ...Object.values(cnt));
-    $('countHead').innerHTML = `<b>${S.trains.length}</b> trains running <span class="muted">· ${S.lang === 'ja' ? '路線別' : 'by line'}</span>`;
-    $('countGrp').innerHTML = OPS.map(([op, col]) => `<span class="gchip"><i style="background:${col}"></i>${op.replace(' Subway', '').replace(' & Others', '').replace(' & AGT', '')} <b>${grp[op] || 0}</b></span>`).join('');
+    $('countHead').innerHTML = `<b>${trains.length}</b> trains running <span class="muted">· ${S.scope === 'all' || !S.area ? (S.lang === 'ja' ? '読み込み済み全域' : 'all loaded') : areaLabel()}</span>`;
+    $('countGrp').innerHTML = OPS.filter(([op]) => grp[op]).map(([op, col]) => `<span class="gchip"><i style="background:${col}"></i>${op.replace(' Subway', '').replace(' & Others', '').replace(' & AGT', '')} <b>${grp[op] || 0}</b></span>`).join('');
+    if (!rows.length) { $('countRows').innerHTML = '<div class="empty-note" style="padding:10px 6px">No line data for this area yet.</div>'; return; }
     $('countRows').innerHTML = rows.map(L => {
       const n = cnt[L.id] || 0, off = S.hidden.has(L.id);
       const split = L.loop && !L.oneway && n ? `<small class="split">↺${L.ccw0 ? (inner[L.id] || 0) : n - (inner[L.id] || 0)} ↻${L.ccw0 ? n - (inner[L.id] || 0) : (inner[L.id] || 0)}</small>` : '';
@@ -927,14 +986,115 @@
     setDataMode(ttData.lines && Object.values(ttData.lines).some(x => x.weekday) ? 'weekday' : 'sim');
   }
 
+  /* ---------------- areas (prefecture under the map centre) + lazy region loading ---------------- */
+  const loadedRegions = new Set(RG.REGIONS.filter(r => r.builtin).map(r => r.id)), loadingRegions = new Set();
+  const regionHasData = prefId => { const r = RG.regionOfPref[prefId]; return !!r && (r.builtin || !!r.file); };
+  const regionIsLoaded = prefId => { const r = RG.regionOfPref[prefId]; return !!r && loadedRegions.has(r.id); };
+  let toastT = 0;
+  function toast(msg, ms) { const el = $('toast'); el.textContent = msg; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { el.hidden = true; }, ms || 2400); }
+
+  function addRegionData(id, d) {
+    const have = new Set(Object.keys(stations));
+    const rows = d.STATION_SRC.trim().split('\n').filter(r => r.trim() && !have.has(r.split('|')[0]));
+    ALL.STATION_SRC += '\n' + rows.join('\n') + '\n';
+    const lineIds = new Set(ALL.LINE_SRC.map(l => l.id));
+    d.LINE_SRC.forEach(l => { if (!lineIds.has(l.id)) ALL.LINE_SRC.push(l); });
+    (d.POIS || []).forEach(p => { if (!poiById[p.id]) POI.push(p); });
+    (d.WATER || []).forEach(poly => WATER_POLYS.push(poly.map(q => TRS.proj(q[0], q[1]))));
+    buildNet(); prepPois(); computeOps();
+    if (S.dataMode !== 'sim' && ttData) TRS.setRealTrips(net, ttData, S.dataMode);
+    buildIndex(); buildSidebar(); updateScopeUi();
+    if (window.__TRS) window.__TRS.net = net;
+  }
+  function loadRegion(r) {
+    if (!r || !r.file || loadedRegions.has(r.id) || loadingRegions.has(r.id)) return;
+    loadingRegions.add(r.id); toast('Loading ' + r.en + ' lines…', 6000);
+    const sc = document.createElement('script'); sc.src = r.file;
+    sc.onload = () => {
+      loadingRegions.delete(r.id);
+      const d = (window.TRS_REGIONS_DATA || {})[r.id];
+      if (!d) { toast('Region data for ' + r.en + ' is empty'); return; }
+      addRegionData(r.id, d); loadedRegions.add(r.id);
+      toast(r.en + ' loaded: ' + d.LINE_SRC.length + ' lines');
+    };
+    sc.onerror = () => { loadingRegions.delete(r.id); toast('Could not load ' + r.en + ' data'); };
+    document.head.appendChild(sc);
+  }
+  function updateArea() {
+    const c = TRS.unproj(S.cam.x, S.cam.y);
+    const area = S.cam.s >= 0.0012 ? RG.nearestPref(c.lat, c.lon) : null;
+    if ((area && area.id) === (S.area && S.area.id)) return;
+    S.area = area;
+    if (area) { const r = RG.regionOfPref[area.id]; if (r && r.file && S.cam.s >= 0.004) loadRegion(r); }
+    updateAreaLabel(); refreshScope();
+  }
+  function updateAreaLabel() { $('areaName').textContent = areaLabel(); }
+  function updateScopeUi() {
+    document.querySelectorAll('#scopeBtns button').forEach(b => b.classList.toggle('on', b.dataset.s === S.scope));
+    const a = S.area, note = $('areaNote'); if (!note) return;
+    if (!a) note.textContent = 'Zoomed out — showing every loaded line. Zoom into a prefecture to scope the dashboard.';
+    else if (!lines.some(L => L.prefs.has(a.id))) note.textContent = 'No line data for ' + areaLabel() + ' yet.' + (regionHasData(a.id) ? ' (loading…)' : '');
+    else if (S.scope === 'area') note.textContent = lines.filter(inScope).length + ' lines serve ' + areaLabel() + ' (nearest-capital approximation of the border).';
+    else note.textContent = 'Showing all ' + lines.length + ' loaded lines.';
+  }
+  function refreshScope() { renderOpChips(); renderLineList(); renderCounts(); updateScopeUi(); }
+  $('scopeBtns').onclick = e => { const b = e.target.closest('button'); if (!b) return; S.scope = b.dataset.s; refreshScope(); };
+  function flyToPref(id) {
+    const pf = RG.prefById[id]; if (!pf) return;
+    const q = TRS.proj(pf.lat, pf.lon); S.follow = null; clearSel();
+    flyTo(q.x + rightPadWorld(), q.y, 0.045, 1000);
+    closeAreaMenu();
+  }
+  // area menu
+  function renderAreaMenu() {
+    const f = normQ($('areaQ').value || '');
+    const rows = RG.PREFS.filter(p => !f || normQ(p.en + p.ja).includes(f));
+    const sorted = rows.slice().sort((x, y) => (regionHasData(y.id) - regionHasData(x.id)));
+    $('areaList').innerHTML = sorted.map(p => {
+      const has = regionHasData(p.id), reg = RG.regionOfPref[p.id];
+      return `<div class="amrow ${has ? '' : 'nodata'} ${S.area && S.area.id === p.id ? 'cur' : ''}" data-p="${p.id}"><span><b>${nm(p)}</b> <small>${nm2(p)}</small></span><em>${has ? reg.en : 'no data yet'}</em></div>`;
+    }).join('') || '<div class="empty-note" style="padding:10px">No match</div>';
+  }
+  function closeAreaMenu() { $('areaMenu').hidden = true; $('areaChip').classList.remove('on'); }
+  $('areaChip').onclick = e => {
+    e.stopPropagation(); const open = $('areaMenu').hidden;
+    if (open) { $('areaMenu').hidden = false; $('areaChip').classList.add('on'); $('areaQ').value = ''; renderAreaMenu(); $('areaQ').focus(); } else closeAreaMenu();
+  };
+  $('areaQ').oninput = renderAreaMenu;
+  $('areaMenu').addEventListener('click', e => { e.stopPropagation(); const r = e.target.closest('.amrow'); if (r) flyToPref(r.dataset.p); });
+  document.addEventListener('click', e => { if (!e.target.closest('#areaMenu') && !e.target.closest('#areaChip')) closeAreaMenu(); });
+
+  // prefecture markers when zoomed out
+  function drawPrefs() {
+    S.prefScreen = [];
+    const s = S.cam.s; if (s >= 0.012) return;
+    const c = T(), placed = [];
+    ctx.font = '600 11.5px Inter, "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif'; ctx.textBaseline = 'middle';
+    RG.PREFS.forEach(p => {
+      const q = TRS.proj(p.lat, p.lon), x = sx(q.x), y = sy(q.y);
+      if (x < -40 || y < -20 || x > S.W + 40 || y > S.H + 20) return;
+      S.prefScreen.push({ p, x, y });
+    });
+    S.prefScreen.forEach(o => {
+      const has = regionHasData(o.p.id), cur = S.area && S.area.id === o.p.id;
+      ctx.beginPath(); ctx.arc(o.x, o.y, cur ? 6 : 4.2, 0, 7);
+      if (has) { ctx.fillStyle = '#7cc4ff'; ctx.fill(); } else { ctx.lineWidth = 1.6; ctx.strokeStyle = c.label; ctx.globalAlpha = .45; ctx.stroke(); ctx.globalAlpha = 1; }
+      if (cur) { ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke(); }
+      const label = nm(o.p), w = ctx.measureText(label).width, r = { x: o.x + 8, y: o.y - 7, w, h: 14 };
+      if (placed.some(q => r.x < q.x + q.w && r.x + r.w > q.x && r.y < q.y + q.h && r.y + r.h > q.y)) return;
+      placed.push(r);
+      ctx.globalAlpha = has ? 1 : .55; ctx.lineWidth = 3; ctx.strokeStyle = c.halo; ctx.strokeText(label, r.x, o.y); ctx.fillStyle = c.label; ctx.fillText(label, r.x, o.y); ctx.globalAlpha = 1;
+    });
+  }
+
   /* ---------------- boot ---------------- */
   try { const th = localStorage.getItem('trs-theme'); if (th) { S.theme = th; document.documentElement.dataset.theme = th; } } catch (_) { }
   resize(); if (S.ui < 1) $('q').placeholder = 'Search station, line, spot…';
-  fitAll(false); buildSidebar(); renderPoiChips();
+  fitAll(false); computeOps(); buildIndex(); buildSidebar(); renderPoiChips(); updateArea(); updateAreaLabel();
   const q0 = new URLSearchParams(location.search);
   if (q0.get('t')) S.t = clamp(+q0.get('t') * 3600, TRS.SERVICE_START, TRS.SERVICE_END - 1);
   if (q0.get('line') && byId[q0.get('line')]) selectItem('line', q0.get('line'), true);
   if (q0.get('stn') && stations[q0.get('stn')]) selectItem('station', q0.get('stn'), true);
-  window.__TRS = { S, net, flyTo, selectItem };
+  window.__TRS = { S, net, flyTo, selectItem, flyToPref, TRS };
   requestAnimationFrame(frame);
 })();

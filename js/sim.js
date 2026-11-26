@@ -7,8 +7,12 @@
   'use strict';
 
   const LAT0 = 35.6812, LON0 = 139.7671;
-  const MX = 111320 * Math.cos(LAT0 * Math.PI / 180), MY = 110574;
-  const proj = (lat, lon) => ({ x: (lon - LON0) * MX, y: -(lat - LAT0) * MY });
+  // Mercator scaled to metres at Tokyo: conformal, so shapes stay right from Hokkaido to Okinawa
+  const RAD = Math.PI / 180, ER = 6378137, K0 = Math.cos(LAT0 * RAD);
+  const merc = lat => Math.log(Math.tan(Math.PI / 4 + lat * RAD / 2));
+  const MY0 = merc(LAT0);
+  const proj = (lat, lon) => ({ x: (lon - LON0) * RAD * ER * K0, y: -(merc(lat) - MY0) * ER * K0 });
+  const unproj = (x, y) => ({ lat: (2 * Math.atan(Math.exp(-y / (ER * K0) + MY0)) - Math.PI / 2) / RAD, lon: LON0 + x / (ER * K0) / RAD });
 
   const SERVICE_START = 4.5 * 3600, SERVICE_END = 28.5 * 3600;
 
@@ -47,9 +51,11 @@
       for (let i = 0; i < V; i++) { const s = stations[ids[i % n]]; pts.push({ x: s.x, y: s.y }); }
       const cum = [0];
       for (let i = 1; i < V; i++) cum.push(cum[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y));
+      let bx0 = 1e12, bx1 = -1e12, by0 = 1e12, by1 = -1e12;
+      pts.forEach(p => { bx0 = Math.min(bx0, p.x); bx1 = Math.max(bx1, p.x); by0 = Math.min(by0, p.y); by1 = Math.max(by1, p.y); });
       const skip = new Set((def.skip || '').split(/\s+/).filter(Boolean).concat(passSet));
       const L = Object.assign({}, def, {
-        order, ids, nums, n, V, pts, cum, len: cum[V - 1], skip,
+        order, ids, nums, n, V, pts, cum, len: cum[V - 1], skip, bbox: { x0: bx0, x1: bx1, y0: by0, y1: by1 },
         textColor: lum(def.color) > 0.62 ? '#111' : '#fff',
         grp: def.grp || def.op,
         label: i => (nums[i % n] == null ? '' : def.code + String(nums[i % n]).padStart(2, '0')),
@@ -225,5 +231,5 @@
     return res.sort((a, b) => (a.times[0] ?? 1e9) - (b.times[0] ?? 1e9));
   }
 
-  g.TRS = { build, setRealTrips, proj, tripState, activeTrips, board, headwayAt, periodOf, PERIOD_LABEL, destName, lowerBound, SERVICE_START, SERVICE_END, LAT0, LON0 };
+  g.TRS = { build, setRealTrips, proj, unproj, tripState, activeTrips, board, headwayAt, periodOf, PERIOD_LABEL, destName, lowerBound, SERVICE_START, SERVICE_END, LAT0, LON0 };
 })(typeof window !== 'undefined' ? window : globalThis);

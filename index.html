@@ -40,6 +40,8 @@
         <button data-q="subway">Subway</button>
         <button data-q="pvt">Private</button>
       </div>
+      <div class="seg" id="scopeBtns"><button data-s="area">This area</button><button data-s="all">All loaded</button></div>
+      <p id="areaNote" class="empty-note" style="margin:6px 0 0"></p>
     </details>
     <div id="lineList" class="line-list"></div>
     <div id="splitter" role="separator" aria-orientation="horizontal" tabindex="0" title="Drag to resize · double-click to reset"></div>
@@ -70,7 +72,12 @@
   <main id="stage">
     <canvas id="map"></canvas>
     <div id="tip" class="tip" hidden></div>
-    <div class="hud tl"><button id="btnCounts" class="hudbtn" title="Trains running per line">📊 <span id="hudTrains">0 trains</span></button><span id="hudPeriod">—</span></div>
+    <div class="hud tl"><button id="areaChip" class="hudbtn" title="Choose an area">📍 <span id="areaName">Tokyo</span> ▾</button><button id="btnCounts" class="hudbtn" title="Trains running per line">📊 <span id="hudTrains">0 trains</span></button><span id="hudPeriod">—</span></div>
+    <div id="areaMenu" class="card amenu" hidden>
+      <input id="areaQ" type="search" placeholder="Find a prefecture…">
+      <div id="areaList" class="amlist"></div>
+    </div>
+    <div id="toast" class="toast" hidden></div>
     <div id="countCard" class="card" hidden>
       <div class="card-head"><div id="countHead"></div><button id="countClose" class="p-close" style="position:static" aria-label="Close">✕</button></div>
       <div id="countGrp" class="gchips"></div>
@@ -98,6 +105,7 @@
 <script src="js/data.js"></script>
 <script src="js/data-extra.js"></script>
 <script src="js/poi.js"></script>
+<script src="js/regions.js"></script>
 <script src="js/sim.js"></script>
 <script src="js/app.js"></script>
 <script src="js/layout.js"></script>
