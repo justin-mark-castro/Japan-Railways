@@ -70,5 +70,5 @@
     }
     return best;
   }
-  g.TRS_REGIONS = { PREFS, REGIONS, prefById, regionOfPref, nearestPref };
+  g.TRS_REGIONS = { PREFS, REGIONS, prefById, regionOfPref, nearestPref, anchors: PTS.map(q => ({ id: q.p.id, lat: q.lat, lon: q.lon })) };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -63,7 +63,15 @@ def romaji(kana):
     return r.replace("n'", "n'")
 def cap(s): return re.sub(r"(^|[- ])([a-z])", lambda m: m.group(1) + m.group(2).upper(), s)
 DIR_PREFIX = {'東': 'ひがし', '西': 'にし', '南': 'みなみ', '北': 'きた', '新': 'しん'}
+STATION_EN_OVERRIDE = {'成田空港（成田第１ターミナル）': 'Narita Airport Terminal 1', '空港第２ビル（成田第２・第３ターミナル）': 'Narita Airport Terminals 2・3'.replace('・', '·'),
+                       '成田空港': 'Narita Airport', '羽田空港': 'Haneda Airport'}
 def en_station(name, kana):
+    if name in STATION_EN_OVERRIDE: return STATION_EN_OVERRIDE[name]
+    m = re.match(r'^(.*?)\s*[(（](.*)[)）]\s*$', name)
+    if m:   # "Base (alias)": romanise each part from its own reading when the data has one
+        kb, kp = split_paren(kata2hira(kana or ''))
+        base = en_station(m.group(1), kb or kata2hira(kana or ''))
+        return base + (' (%s)' % en_station(m.group(2), kp) if kp else '')
     k = kata2hira(kana or ''); r = romaji(k)
     if not r: return name
     n = name.replace('ケ', 'ヶ')
@@ -181,10 +189,24 @@ def sid(code): return merged.get(code) or 'a%d' % code
 out_lines = []; used_stations = {}
 dropped = collections.Counter()
 cur_sets = {lid: set(l['ids']) for lid, l in cur['lines'].items()}
-for lm in line_meta:
-    if lm['closed']: continue
-    d = json.load(open(os.path.join(sdb_dir, 'line', '%d.json' % lm['code'])))
-    sl = [s for s in d['station_list'] if not s['closed']]
+# Y-shaped lines come as one station list; the part that is a spur is cut off into its own line so no phantom edge joins the spur's end to the other branch
+SPURS = {'JR成田線': ('成田', ('空港第２ビル', '成田空港'), 'JR成田線(空港支線)')}   # line: (junction station, spur stations, spur line name)
+def jobs():
+    for lm in line_meta:
+        if lm['closed']: continue
+        d = json.load(open(os.path.join(sdb_dir, 'line', '%d.json' % lm['code'])))
+        sl = [s for s in d['station_list'] if not s['closed']]
+        sp = SPURS.get(lm['name'])
+        if sp and lm['code'] == 11327:
+            spur = [x for x in sl if x['name'].startswith(sp[1])]
+            junc = [x for x in sl if x['name'] == sp[0]]
+            if spur and junc:
+                yield lm, d, [x for x in sl if not x['name'].startswith(sp[1])]
+                lm2 = dict(lm, code=lm['code'] * 100 + 90, name=sp[2], sym_code=lm['code']); d2 = dict(d, name_kana='なりたせん(くうこうしせん)')
+                yield lm2, d2, junc[:1] + spur
+                continue
+        yield lm, d, sl
+for lm, d, sl in jobs():
     if len(sl) < 2: continue
     ids = []
     for s in sl:
@@ -192,7 +214,7 @@ for lm in line_meta:
         if not ids or ids[-1] != i: ids.append(i)
     if len(ids) < 2: continue
     # service patterns that only re-run other lines' tracks (they would draw a second copy on top of them)
-    if re.search(r'湘南新宿ライン|上野東京ライン|成田エクスプレス|ライナー|スカイアクセス', lm['name']): dropped['service pattern'] += 1; continue
+    if re.search(r'湘南新宿ライン|上野東京ライン|成田エクスプレス|ライナー', lm['name']): dropped['service pattern'] += 1; continue
     # operator + railway type via N02
     votes = collections.Counter()
     for s in sl:
@@ -241,6 +263,7 @@ for lm in line_meta:
     ja = name if (len(name) > 3 or op in name) else (op + name if op else name)
     st_lookup = {norm(x['name']): en_station(x['name'], x.get('name_kana')) for x in sl}
     en = en_line(name, d.get('name_kana'), st_lookup)
+    if lm.get('sym_code'): en = 'JR Narita Line (Airport Branch)'
     if len(name) <= 3 and op in OP_EN and not en.startswith(OP_EN[op].split()[0]): en = (OP_EN[op] + ' ' + en).strip()
     # official station numbering (駅ナンバリング): use it when most stops carry a number with the line's symbol
     NUM_RE = re.compile(r'^([A-Za-z]{1,4})[\s\-]?(\d{1,3})$')
@@ -248,7 +271,7 @@ for lm in line_meta:
     for x in sl:
         ms = [NUM_RE.match(n) for n in (x.get('numbering') or [])]
         per.append([(m.group(1).upper(), int(m.group(2))) for m in ms if m])
-    sym = (symbols.get(lm['code']) or '').upper()
+    sym = (symbols.get(lm.get('sym_code', lm['code'])) or '').upper()
     if not sym:
         cnt = collections.Counter(pfx for ps in per for pfx, _ in ps)
         sym = cnt.most_common(1)[0][0] if cnt else ''

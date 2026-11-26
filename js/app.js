@@ -1080,8 +1080,9 @@
   }
   const loadedParts = new Set(['kanto']);   // 'kanto' = built-in hand-authored Tokyo data
   const loadScript = src => new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = src + '?v=' + (window.TRS_VERSION || ''); sc.onload = res; sc.onerror = rej; document.head.appendChild(sc); });
+  const failedRegions = new Set();
   function loadRegion(r) {
-    if (!r || loadingRegions.has(r.id)) return;
+    if (!r || loadingRegions.has(r.id) || failedRegions.has(r.id)) return;
     const parts = [r.file && { key: r.id, file: r.file }, r.auto && { key: r.id + '-auto', file: r.auto }, r.auto && { key: r.id + '-shape', file: r.auto.replace(/\.js$/, '-shape.js'), optional: true }].filter(p => p && !loadedParts.has(p.key));
     if (!parts.length) { loadedRegions.add(r.id); return; }
     loadingRegions.add(r.id); if (!r.national) toast('Loading ' + r.en + ' lines…', 6000);
@@ -1096,11 +1097,20 @@
         }
         loadedRegions.add(r.id);
         if (!r.national) toast(r.en + ' loaded: ' + nLines + ' lines');
-      } catch (_) { toast('Could not load ' + r.en + ' data'); }
+      } catch (_) { failedRegions.add(r.id); toast('Could not load ' + r.en + ' data'); }
       loadingRegions.delete(r.id);
     })();
   }
+  // load every region that has an anchor point on screen (not just the one under the centre), so a zoomed-out view of e.g. Hokkaido shows its lines
+  const ANCHORS = RG.anchors.map(a => Object.assign({ r: RG.regionOfPref[a.id] }, TRS.proj(a.lat, a.lon)));
+  function loadVisibleRegions() {
+    if (S.cam.s < 0.0012) return;
+    const m = 60 / S.cam.s, x0 = wx(0) - m, x1 = wx(S.W) + m, y0 = wy(0) - m, y1 = wy(S.H) + m;
+    const seen = new Set();
+    ANCHORS.forEach(a => { if (a.r && (a.r.file || a.r.auto) && !seen.has(a.r.id) && a.x > x0 && a.x < x1 && a.y > y0 && a.y < y1) { seen.add(a.r.id); loadRegion(a.r); } });
+  }
   function updateArea() {
+    loadVisibleRegions();
     const c = TRS.unproj(S.cam.x, S.cam.y);
     const area = S.cam.s >= 0.0012 ? RG.nearestPref(c.lat, c.lon) : null;
     if ((area && area.id) === (S.area && S.area.id)) return;
