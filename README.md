@@ -56,6 +56,7 @@ Caveats: the "area" is the prefecture whose capital is nearest the view centre �
 ## Structure
 - `js/regions.js`, `js/regions/` – prefectures, region loader and lazy region data
 - `js/data.js`, `js/data-extra.js` – stations, lines, colours, codes, frequencies
+- `js/station-badge.js` – station-number badges in Japanese signage style (JR rounded square with 3-letter station code, ring for Metro/Toei/private); SVG for the UI, canvas for map labels
 - `js/poi.js` – tourist spots
 - `js/sim.js` – network builder + stateless schedule engine (simulated or real trips)
 - `js/app.js` – canvas renderer, UI, search, interaction
