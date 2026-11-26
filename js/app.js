@@ -36,7 +36,11 @@
     return pad2(h) + ':' + pad2(m) + (withSec ? ':' + pad2(s) : '');
   }
   const sym = (L, sm) => `<span class="sym ${L.type} ${sm ? 'sm' : ''}" style="--c:${L.color};--tc:${L.textColor}">${L.type === 'jr' ? L.code : L.code}</span>`;
-  const bdg = (L, num, sm) => `<span class="bdg">${sym(L, sm)}${num != null ? `<span class="no" style="--c:${L.color}">${pad2(num)}</span>` : ''}</span>`;
+  // Station-number badge (JR square / Metro-style ring) when num is given, otherwise the plain line symbol.
+  // Pass the station as 4th arg to get the 3-letter JR station code on top (large badges only).
+  const bdg = (L, num, sm, st) => num == null
+    ? `<span class="bdg">${sym(L, sm)}</span>`
+    : `<span class="bdg">${StationBadge.svg(L, num, { size: sm ? 28 : 48, code: !sm && st ? StationBadge.abbr(st.id) : '' })}</span>`;
   const lineName = L => nm(L);
   const normQ = s => s.toLowerCase().replace(/[\s\-・'’.,]/g, '');
 
@@ -270,11 +274,11 @@
         const vl = focus ? o.vl.filter(v => v.line === focus) : o.vl;
         badges = vl.map(v => ({ v, label: v.line.label(v.idx) }));
       }
-      ctx.font = `700 ${9.5 * u}px Inter, system-ui, sans-serif`;
-      const bw = badges.map(b => ctx.measureText(b.label).width + 8 * u);
+      const BS = 22 * u;                       // station-number badge size (square)
+      const bw = badges.map(() => BS);
       const rowW = bw.reduce((a, b) => a + b + 3, 0);
       const showSub = s >= 0.3;
-      const blockW = Math.max(tw, rowW), blockH = fs + 3 + (showSub ? 12 * u : 0) + (badges.length ? 16 * u : 0);
+      const blockW = Math.max(tw, rowW), blockH = fs + 3 + (showSub ? 12 * u : 0) + (badges.length ? BS + 3 * u : 0);
       const gap = o.r + 5 * u;
       const cand = [
         { x: o.x + gap, y: o.y - blockH / 2, a: 'l' }, { x: o.x - gap - blockW, y: o.y - blockH / 2, a: 'r' },
@@ -301,12 +305,9 @@
       if (badges.length) {
         yy += 5 * u;
         let bx = k.a === 'r' ? k.x + blockW - rowW + 3 : k.a === 'c' ? k.x + blockW / 2 - rowW / 2 : k.x;
-        ctx.textAlign = 'center'; ctx.font = `700 ${9.5 * u}px Inter, system-ui, sans-serif`;
         badges.forEach((b, i) => {
           const L = b.v.line;
-          ctx.fillStyle = L.color; roundRect(bx, yy, bw[i], 13 * u, (L.type === 'jr' ? 3.5 : 6.5) * u); ctx.fill();
-          ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 1; ctx.stroke();
-          ctx.fillStyle = L.textColor; ctx.fillText(b.label, bx + bw[i] / 2, yy + 9.8 * u);
+          StationBadge.draw(ctx, L, b.label.slice(L.code.length), bx, yy, bw[i]);
           bx += bw[i] + 3;
         });
       }
@@ -614,7 +615,7 @@
   function stationHTML(st) {
     const xfers = st.lines.filter(x => !x.skipped);
     return `<div class="p-head">${closeBtn}
-      <div class="xfer" style="gap:8px">${st.lines.filter(x => !x.skipped).map(x => bdg(x.line, x.num)).join('')}</div>
+      <div class="xfer" style="gap:8px">${st.lines.filter(x => !x.skipped).map(x => bdg(x.line, x.num, false, st)).join('')}</div>
       <div class="p-title">${nm(st)}</div><div class="p-sub">${nm2(st)}${st.lines.filter(x => !x.skipped).length > 1 ? ` · ${st.lines.filter(x => !x.skipped).length} lines` : ''}</div></div>
       <div class="p-body">
         <div class="p-sec">Lines <span class="live" style="margin-left:8px;text-transform:none;letter-spacing:0">simulated</span></div>
