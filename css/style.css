@@ -281,3 +281,6 @@ kbd{font-size:11px;border:1px solid var(--line);border-radius:6px;padding:1px 6p
 .amrow.nodata{opacity:.55}.amrow.nodata em{color:var(--muted)}
 .toast{position:absolute;left:50%;bottom:64px;transform:translateX(-50%);background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:7px 16px;font-size:12.5px;box-shadow:var(--shadow);z-index:30;pointer-events:none}
 .toast[hidden]{display:none}
+
+.sym.shin{clip-path:polygon(10% 0,100% 0,90% 100%,0 100%);min-width:34px;padding:0 9px;border-radius:0;letter-spacing:.02em}
+.sym.shin.sm{min-width:28px}

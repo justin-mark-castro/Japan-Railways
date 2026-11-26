@@ -58,7 +58,7 @@
         order, ids, nums, n, V, pts, cum, len: cum[V - 1], skip, bbox: { x0: bx0, x1: bx1, y0: by0, y1: by1 },
         textColor: lum(def.color) > 0.62 ? '#111' : '#fff',
         grp: def.grp || def.op,
-        label: i => (nums[i % n] == null ? '' : def.code + String(nums[i % n]).padStart(2, '0')),
+        label: i => (def.nonum || nums[i % n] == null ? '' : def.code + String(nums[i % n]).padStart(2, '0')),
         dirNames: def.dirs || null
       });
       ids.forEach((id, i) => stations[id].lines.push({ line: L, idx: i, num: nums[i], skipped: skip.has(id) }));

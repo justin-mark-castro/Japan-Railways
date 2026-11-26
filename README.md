@@ -16,6 +16,7 @@ Open `index.html` (or host on GitHub Pages) — no build step, no dependencies.
 - Click a station for interchanges + departure board; a line for stats; a train for route and ETAs
 - Time controls: scrub the day, 1×–120×, rush-hour / daytime / last-train presets, "Now" (JST)
 - EN / 日本語, dark / light, mobile friendly
+- **Shinkansen (whole network)**: 14 lines — Nozomi (Tokyo–Hakata), Hikari, Kodama (Tokaido and Sanyo), Mizuho/Sakura, Tsubame, Kamome (Nishi-Kyushu), Hayabusa, Yamabiko, Hokkaido, Joetsu, Hokuriku, and the Akita and Yamagata mini-shinkansen branches. They load at start-up as a national layer, so trains and station names are visible even with the whole of Japan on screen
 - **Beyond Tokyo (phase 1)**: zoom out to see all of Japan with prefecture markers. The dashboard follows the map — the 📍 area chip (top-left) shows the prefecture under the view centre, and the line list, operator chips and train counts are scoped to it ("This area") or to everything loaded ("All loaded"). Click the chip to jump to any of the 47 prefectures. Kansai (Osaka, Kyoto, Kobe, Shiga, Nara, Wakayama) loads on demand as a proof of concept
 
 ## Accuracy — please read
@@ -51,9 +52,10 @@ TRS_REGIONS_DATA.kansai = { STATION_SRC: [...], LINE_SRC: [...], POIS: [...], WA
 ```
 Use the same row formats as `js/data.js` / `js/data-extra.js`, give lines a `grp` (operator group), and keep station ids unique across regions (Kansai prefixes clashing ids with `o`).
 
-Caveats: the "area" is the prefecture whose capital is nearest the view centre — an approximation of real borders. The Kansai file is hand-authored, approximate and incomplete (9 lines, ~110 stations); only the Tokyo Bay and Osaka Bay outlines are drawn, there is no national coastline yet; and outside Tokyo trains are simulated. Shinkansen and a nationwide data importer are planned next.
+Caveats: the "area" is the prefecture whose capital is nearest the view centre — an approximation of real borders. The Kansai file is hand-authored, approximate and incomplete (9 lines, ~110 stations); only the Tokyo Bay and Osaka Bay outlines are drawn, there is no national coastline yet; and outside Tokyo trains are simulated. The Shinkansen layer (`js/regions/shinkansen.js`) is the exception: station order and km spacing come from public line articles, journey times are calibrated to published fastest/typical times (e.g. Tokyo–Shin-Osaka 2h21 Nozomi, Tokyo–Shin-Aomori ~3h10), but coordinates are hand-entered (±~1 km), frequencies are rounded headways rather than the real timetable, services that run through between lines (Komachi, Tsubasa, Nasuno, Hayate, Asama, Tsurugi) are not modelled as through trains, and Shinkansen station codes are omitted. The Sapporo extension is not included (under construction). A nationwide importer for conventional lines is still planned.
 
 ## Structure
+- `js/regions/shinkansen.js` – national Shinkansen layer (loads at start-up)
 - `js/regions.js`, `js/regions/` – prefectures, region loader and lazy region data
 - `js/data.js`, `js/data-extra.js` – stations, lines, colours, codes, frequencies
 - `js/station-badge.js` – station-number badges in Japanese signage style (JR rounded square, ring for Metro/Toei/private); SVG for the UI, canvas for map labels

@@ -195,15 +195,16 @@
     ctx.lineJoin = 'round'; ctx.lineCap = 'round';
     lineSS = {};
     // draw subways first, JR on top
-    const order = lines.filter(drawn).sort((a, b) => (a.type === 'jr') - (b.type === 'jr'));
+    const rail = L => (L.type === 'jr' || L.type === 'shin') + (L.type === 'shin');
+    const order = lines.filter(drawn).sort((a, b) => rail(a) - rail(b));
     order.forEach(L => {
       const ss = lineSS[L.id] = lineScreen(L, spacing);
-      const lw = L.type === 'jr' ? w * 1.12 : w * 0.92;
+      const lw = L.type === 'shin' ? Math.max(w * 1.25, s < 0.006 ? 2.4 : 0) : L.type === 'jr' ? w * 1.12 : w * 0.92;
       ctx.globalAlpha = focus && focus !== L ? 0.16 : 1;
       ctx.beginPath(); ss.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
       ctx.strokeStyle = c.casing; ctx.lineWidth = lw + 2.6 * u; ctx.stroke();
       ctx.strokeStyle = L.color; ctx.lineWidth = lw; ctx.stroke();
-      if (L.type === 'jr' && lw >= 4) {
+      if ((L.type === 'jr' || L.type === 'shin') && lw >= 4) {
         ctx.setLineDash([lw * 1.3, lw * 1.3]); ctx.strokeStyle = 'rgba(255,255,255,.75)'; ctx.lineWidth = Math.max(1, lw * 0.22); ctx.stroke(); ctx.setLineDash([]);
       }
     });
@@ -231,13 +232,13 @@
 
   function drawStations(w) {
     const c = T(), s = S.cam.s, focus = selectedLine();
-    const base = clamp(1.6 + 16 * s, 2.4, 7.5) * S.ui;
+    const base = clamp(1.6 + 16 * s, 2.4, 7.5) * S.ui * (s < 0.006 ? 0.85 : 1);
     S.stScreen = [];
-    if (s < 0.006) return;
-    const margin = 40;
+    const natl = s < 0.006, margin = 40;
     Object.values(stations).forEach(st => {
       let vl = stationVisibleLines(st);
       if (!vl.length) return;
+      if (natl && !vl.every(v => v.line.type === 'shin')) return;
       if (S.opts.inter && vl.length < 2) return;
       const x = sx(st.x), y = sy(st.y);
       if (x < -margin || y < -margin || x > S.W + margin || y > S.H + margin) return;
@@ -269,7 +270,7 @@
     const u = S.ui, fs = clamp(11 + s * 14, 11, 14) * u, FN = 'Inter, "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif';
     const placed = [];
     const items = S.stScreen.map(o => {
-      let pri = o.vl.length * 10 + (o.vl.some(v => v.line.type === 'jr') ? 4 : 0);
+      let pri = o.vl.length * 10 + (o.vl.some(v => v.line.type === 'jr') ? 4 : 0) + o.vl.filter(v => v.line.type === 'shin').length * 8;
       if (focus && o.vl.some(v => v.line === focus)) pri += 100;
       if (S.sel && S.sel.type === 'station' && S.sel.id === o.st.id) pri += 1000;
       return { o, pri };
@@ -343,6 +344,7 @@
   }
   function badgePath(L, r) {
     if (L.type === 'jr') roundRect(-r, -r, r * 2, r * 2, r * .36);
+    else if (L.type === 'shin') { ctx.beginPath(); ctx.moveTo(-r * 1.15, -r * .9); ctx.lineTo(r * 1.4, -r * .9); ctx.lineTo(r * 1.15, r * .9); ctx.lineTo(-r * 1.4, r * .9); ctx.closePath(); }
     else if (L.type === 'pvt') roundRect(-r * 1.25, -r * .85, r * 2.5, r * 1.7, r * .85);
     else if (L.type === 'mono') { ctx.beginPath(); for (let k = 0; k < 6; k++) { const an = Math.PI / 3 * k + Math.PI / 6; ctx[k ? 'lineTo' : 'moveTo'](Math.cos(an) * r * 1.08, Math.sin(an) * r * 1.08); } ctx.closePath(); }
     else if (L.type === 'tram') roundRect(-r * 1.2, -r * .9, r * 2.4, r * 1.8, r * .28);
@@ -350,10 +352,11 @@
   }
   function drawTrains() {
     S.trainScreen = [];
-    if (!S.opts.trains || S.cam.s < 0.006) return;
+    if (!S.opts.trains) return;
     const s = S.cam.s, focus = selectedLine(), c = T();
     const R = clamp(0.6 + 72 * s, 3.6, 12.5) * S.ui;
     S.trains.forEach(t => {
+      if (S.cam.s < 0.006 && t.line.type !== 'shin') return;
       const ss = lineSS[t.line.id]; if (!ss) return;
       const p = posScreen(t.line, ss, t.d);
       if (p.x < -40 || p.y < -40 || p.x > S.W + 40 || p.y > S.H + 40) return;
@@ -524,8 +527,8 @@
   }
 
   /* ---------------- sidebar ---------------- */
-  const GRP_COL = { 'JR East': '#9ACD32', 'JR West': '#E8453C', 'Tokyo Metro': '#FF9500', 'Toei Subway': '#6CBB5A', 'Osaka Metro': '#E5171F', 'Private & Others': '#8F76D6', 'Trams': '#E5508F', 'Monorails & AGT': '#2BB3A3' };
-  const GRP_ORDER = ['JR East', 'JR West', 'Tokyo Metro', 'Toei Subway', 'Osaka Metro', 'Private & Others', 'Trams', 'Monorails & AGT'];
+  const GRP_COL = { 'JR East': '#9ACD32', 'JR West': '#E8453C', 'Tokyo Metro': '#FF9500', 'Toei Subway': '#6CBB5A', 'Osaka Metro': '#E5171F', 'Private & Others': '#8F76D6', 'Trams': '#E5508F', 'Monorails & AGT': '#2BB3A3', 'Shinkansen': '#4F8DF5' };
+  const GRP_ORDER = ['JR East', 'JR West', 'Tokyo Metro', 'Toei Subway', 'Osaka Metro', 'Private & Others', 'Trams', 'Monorails & AGT', 'Shinkansen'];
   let OPS = [];
   function computeOps() {
     const seen = []; lines.forEach(L => { if (!seen.includes(L.grp)) seen.push(L.grp); });
@@ -570,7 +573,7 @@
         html += `<div class="lrow ${S.hidden.has(L.id) ? 'off' : ''} ${S.sel && S.sel.type === 'line' && S.sel.id === L.id ? 'active' : ''}" data-id="${L.id}" style="--c:${L.color};--tc:${L.textColor}">
           <button class="eye" data-eye="${L.id}" aria-label="Toggle ${L.en}">${S.hidden.has(L.id) ? '' : '✓'}</button>
           ${bdg(L)}
-          <div class="nm"><b>${lineName(L)}</b><small>${L.type === 'pvt' || L.type === 'tram' || L.type === 'mono' ? L.op + ' · ' : ''}${nm2(L)} · ${L.n} stn</small></div>
+          <div class="nm"><b>${lineName(L)}</b><small>${L.type === 'pvt' || L.type === 'tram' || L.type === 'mono' || L.type === 'shin' ? L.op + ' · ' : ''}${nm2(L)} · ${L.n} stn</small></div>
           <span class="cnt" data-l="${L.id}" title="trains running">0</span></div>`;
       });
     });
@@ -1090,6 +1093,7 @@
   try { const th = localStorage.getItem('trs-theme'); if (th) { S.theme = th; document.documentElement.dataset.theme = th; } } catch (_) { }
   resize(); if (S.ui < 0.8) $('q').placeholder = 'Search station, line, spot…';
   fitAll(false); computeOps(); buildIndex(); buildSidebar(); renderPoiChips(); updateArea(); updateAreaLabel();
+  RG.REGIONS.filter(r => r.national).forEach(loadRegion);
   const q0 = new URLSearchParams(location.search);
   if (q0.get('t')) S.t = clamp(+q0.get('t') * 3600, TRS.SERVICE_START, TRS.SERVICE_END - 1);
   if (q0.get('line') && byId[q0.get('line')]) selectItem('line', q0.get('line'), true);

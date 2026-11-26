@@ -37,6 +37,7 @@
   // file: script under js/regions/ that fills TRS_REGIONS_DATA[id]; null = not authored/imported yet
   const REGIONS = [
     { id: 'kanto', en: 'Kanto', ja: '関東', prefs: ['tokyo', 'kanagawa', 'saitama', 'chiba'], file: null, builtin: true },
+    { id: 'shinkansen', en: 'Shinkansen', ja: '新幹線', prefs: [], file: 'js/regions/shinkansen.js', national: true },
     { id: 'kansai', en: 'Kansai', ja: '関西', prefs: ['osaka', 'kyoto', 'hyogo', 'nara', 'shiga', 'wakayama'], file: 'js/regions/kansai.js' }
   ];
   const prefById = Object.fromEntries(PREFS.map(p => [p.id, p]));
