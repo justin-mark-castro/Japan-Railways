@@ -38,6 +38,9 @@
   const REGIONS = [
     { id: 'kanto', en: 'Kanto', ja: '関東', prefs: ['tokyo', 'kanagawa', 'saitama', 'chiba'], file: null, builtin: true },
     { id: 'shinkansen', en: 'Shinkansen', ja: '新幹線', prefs: [], file: 'js/regions/shinkansen.js', national: true },
+    { id: 'chubu', en: 'Chubu', ja: '中部', prefs: ['aichi', 'gifu', 'shizuoka', 'mie', 'nagano', 'yamanashi', 'niigata', 'toyama', 'ishikawa', 'fukui'], file: 'js/regions/chubu.js' },
+    { id: 'tohoku', en: 'Tohoku', ja: '東北', prefs: ['aomori', 'iwate', 'miyagi', 'akita', 'yamagata', 'fukushima'], file: 'js/regions/tohoku.js' },
+    { id: 'kyushu', en: 'Kyushu', ja: '九州', prefs: ['fukuoka', 'saga', 'nagasaki', 'kumamoto', 'oita', 'miyazaki', 'kagoshima', 'okinawa'], file: 'js/regions/kyushu.js' },
     { id: 'kansai', en: 'Kansai', ja: '関西', prefs: ['osaka', 'kyoto', 'hyogo', 'nara', 'shiga', 'wakayama'], file: 'js/regions/kansai.js' }
   ];
   const prefById = Object.fromEntries(PREFS.map(p => [p.id, p]));
