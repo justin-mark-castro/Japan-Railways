@@ -18,22 +18,28 @@
     return (0.299 * r + 0.587 * gg + 0.114 * b) / 255;
   }
 
-  function build(src) {
+  function build(src, opts) {
+    opts = opts || {};
+    const geo = opts.geometry || {};
     const stations = {};
     src.STATION_SRC.trim().split('\n').forEach(row => {
-      const [id, en, ja, lat, lon] = row.split('|');
-      const p = proj(+lat, +lon);
-      stations[id] = { id, en, ja, lat: +lat, lon: +lon, x: p.x, y: p.y, lines: [] };
+      if (!row.trim()) return;
+      const [id, en, ja, lat0, lon0] = row.split('|');
+      let lat = +lat0, lon = +lon0;
+      if (geo[id]) { lat = geo[id][0]; lon = geo[id][1]; }
+      const p = proj(lat, lon);
+      stations[id] = { id, en, ja, lat, lon, x: p.x, y: p.y, lines: [] };
     });
 
     const lines = src.LINE_SRC.map((def, order) => {
-      const ids = [], nums = [];
+      const ids = [], nums = [], passSet = [];
       let num = 0;
       def.st.trim().split(/\s+/).forEach(tok => {
         const [id, n] = tok.split(':');
-        num = n !== undefined ? +n : num + 1;
         if (!stations[id]) throw new Error('Unknown station ' + id + ' in ' + def.id);
-        ids.push(id); nums.push(num);
+        if (n === '-') { nums.push(null); passSet.push(id); }
+        else { num = n !== undefined ? +n : num + 1; nums.push(num); }
+        ids.push(id);
       });
       const n = ids.length;
       const V = def.loop ? n + 1 : n;
@@ -41,11 +47,12 @@
       for (let i = 0; i < V; i++) { const s = stations[ids[i % n]]; pts.push({ x: s.x, y: s.y }); }
       const cum = [0];
       for (let i = 1; i < V; i++) cum.push(cum[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y));
-      const skip = new Set((def.skip || '').split(/\s+/).filter(Boolean));
+      const skip = new Set((def.skip || '').split(/\s+/).filter(Boolean).concat(passSet));
       const L = Object.assign({}, def, {
         order, ids, nums, n, V, pts, cum, len: cum[V - 1], skip,
         textColor: lum(def.color) > 0.62 ? '#111' : '#fff',
-        label: i => def.code + String(nums[i % n]).padStart(2, '0'),
+        grp: def.grp || def.op,
+        label: i => (nums[i % n] == null ? '' : def.code + String(nums[i % n]).padStart(2, '0')),
         dirNames: def.dirs || null
       });
       ids.forEach((id, i) => stations[id].lines.push({ line: L, idx: i, num: nums[i], skipped: skip.has(id) }));
@@ -137,6 +144,14 @@
   }
 
   function activeTrips(L, st, out) {
+    if (L.real) {
+      const R = L.real, s0 = lowerBound(R.starts, st - R.maxT - 1);
+      for (let i = s0; i < R.trips.length && R.trips[i].start <= st; i++) {
+        const tr = R.trips[i], ts = tripState(L, tr.tpl, tr.start, st);
+        if (ts) { ts.line = L; ts.dir = tr.tpl.dir; ts.start = tr.start; ts.tpl = tr.tpl; ts.key = L.id + 'r' + i; out.push(ts); }
+      }
+      return out;
+    }
     for (let dir = 0; dir < 2; dir++) {
       const tpl = L.tpl[dir];
       const s0 = lowerBound(tpl.starts, st - tpl.T - 1);
@@ -148,17 +163,51 @@
     return out;
   }
 
-  function destName(L, dir, stations, lang) {
+  // Install explicit (real) trips: data = {lines:{ID:{weekday:[{d,t0,v,a,p}],holiday:[...]}}}
+  function setRealTrips(net, data, dayType) {
+    let n = 0;
+    net.lines.forEach(L => {
+      const arr = data && data.lines && data.lines[L.id] && data.lines[L.id][dayType];
+      if (!arr || !arr.length) { L.real = null; return; }
+      const trips = arr.map(t => {
+        const cumAt = t.v.map(vi => L.cum[vi]);
+        return { start: t.t0, tpl: { dir: t.d, stops: t.v, arr: t.a, dep: t.p, cumAt, T: t.a[t.a.length - 1] } };
+      }).sort((x, y) => x.start - y.start);
+      L.real = { trips, starts: trips.map(t => t.start), maxT: Math.max.apply(null, trips.map(t => t.tpl.T)) };
+      n += trips.length;
+    });
+    return n;
+  }
+
+  function destName(L, dir, stations, lang, tplIn) {
     if (L.loop) return L.dirNames[dir];
-    const tpl = L.tpl[dir];
+    const tpl = tplIn || L.tpl[dir];
     const s = stations[L.ids[tpl.stops[tpl.stops.length - 1] % L.n]];
     return lang === 'ja' ? s.ja : s.en;
   }
 
   // Upcoming departures for a station
   function board(net, stationId, st, perDir) {
-    const S = net.stations[stationId], res = [];
-    S.lines.forEach(({ line: L, idx }) => {
+    const S = net.stations[stationId], res = [], per = perDir || 3;
+    S.lines.forEach(({ line: L, idx, skipped }) => {
+      if (skipped) return;
+      if (L.real) {
+        const R = L.real, groups = {};
+        const s0 = lowerBound(R.starts, st - R.maxT - 1);
+        for (let i = s0; i < R.trips.length && R.trips[i].start < st + 4 * 3600; i++) {
+          const tr = R.trips[i], tp = tr.tpl;
+          let k = -1;
+          for (let j = 0; j < tp.stops.length; j++) if (tp.stops[j] % L.n === idx) { k = j; break; }
+          if (k < 0 || (!L.loop && k === tp.stops.length - 1)) continue;
+          const t = tr.start + tp.dep[k];
+          if (t < st - 5) continue;
+          const dest = tp.stops[tp.stops.length - 1] % L.n, key = tp.dir + '|' + dest;
+          const g = groups[key] || (groups[key] = { line: L, dir: tp.dir, times: [], destId: L.ids[dest], tpl: tp });
+          if (g.times.length < per) g.times.push(t);
+        }
+        Object.keys(groups).forEach(k => res.push(groups[k]));
+        return;
+      }
       for (let dir = 0; dir < 2; dir++) {
         const tpl = L.tpl[dir];
         let k = -1;
@@ -168,12 +217,12 @@
         const off = tpl.dep[k];
         const i0 = lowerBound(tpl.starts, st - off - 5);
         const times = [];
-        for (let i = i0; i < tpl.starts.length && times.length < (perDir || 3); i++) times.push(tpl.starts[i] + off);
-        res.push({ line: L, dir, times, skipped: L.skip.has(stationId) });
+        for (let i = i0; i < tpl.starts.length && times.length < per; i++) times.push(tpl.starts[i] + off);
+        res.push({ line: L, dir, times, tpl, destId: L.ids[tpl.stops[tpl.stops.length - 1] % L.n] });
       }
     });
     return res.sort((a, b) => (a.times[0] ?? 1e9) - (b.times[0] ?? 1e9));
   }
 
-  g.TRS = { build, proj, tripState, activeTrips, board, headwayAt, periodOf, PERIOD_LABEL, destName, lowerBound, SERVICE_START, SERVICE_END, LAT0, LON0 };
+  g.TRS = { build, setRealTrips, proj, tripState, activeTrips, board, headwayAt, periodOf, PERIOD_LABEL, destName, lowerBound, SERVICE_START, SERVICE_END, LAT0, LON0 };
 })(typeof window !== 'undefined' ? window : globalThis);

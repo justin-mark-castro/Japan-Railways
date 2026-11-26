@@ -1,9 +1,13 @@
 /* ------------------------------------------------------------------
  * Tokyo Rail Sim — UI, rendering and interaction
  * ------------------------------------------------------------------ */
-(function () {
+(async function () {
   'use strict';
-  const net = TRS.build(TRS_DATA);
+  async function loadJSON(url) { try { const r = await fetch(url, { cache: 'no-cache' }); return r.ok ? await r.json() : null; } catch (_) { return null; } }
+  const manifest = (await loadJSON('data/manifest.json')) || {};
+  const geoData = manifest.geometry ? await loadJSON('data/geometry.json') : null;
+  const ttData = manifest.timetable ? await loadJSON('data/timetable.json') : null;
+  const net = TRS.build(TRS_DATA, { geometry: geoData && geoData.stations });
   const { stations, lines, byId } = net;
   const $ = id => document.getElementById(id);
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -12,10 +16,11 @@
   /* ---------------- state ---------------- */
   const S = {
     lang: 'en', theme: 'dark', t: 8 * 3600, speed: 10, playing: true,
-    hidden: new Set(), ops: { 'JR East': true, 'Tokyo Metro': true, 'Toei Subway': true },
+    hidden: new Set(), ops: { 'JR East': true, 'Tokyo Metro': true, 'Toei Subway': true, 'Private & Others': true },
     sel: null,            // {type:'station'|'line'|'train', id}
     follow: null,
-    opts: { trains: true, names: true, badges: true, inter: false, water: true },
+    opts: { trains: true, names: true, badges: true, inter: false, water: true, poi: true },
+    poiCats: {}, dataMode: 'sim', countsOpen: false,
     cam: { x: -2600, y: 500, s: 0.06 }, W: 800, H: 600, dpr: 1,
     anim: null, trains: [], trainIdx: {}, stScreen: [], hover: null, dragging: false
   };
@@ -34,6 +39,18 @@
   const bdg = (L, num, sm) => `<span class="bdg">${sym(L, sm)}${num != null ? `<span class="no" style="--c:${L.color}">${pad2(num)}</span>` : ''}</span>`;
   const lineName = L => nm(L);
   const normQ = s => s.toLowerCase().replace(/[\s\-・'’.,]/g, '');
+
+  /* ---------------- tourist spots ---------------- */
+  const POI = TRS_POI.POIS, POI_CATS = TRS_POI.CATS, poiById = {};
+  S.poiHidden = new Set();
+  POI.forEach(p => {
+    const q = TRS.proj(p.lat, p.lon); p.x = q.x; p.y = q.y; poiById[p.id] = p;
+    p.near = Object.values(stations).map(st => ({ st, d: Math.hypot(st.x - p.x, st.y - p.y) }))
+      .filter(o => o.st.lines.some(x => !x.skipped)).sort((a, b) => a.d - b.d)
+      .filter(o => o.d < 1600).slice(0, 3)
+      .map(o => ({ st: o.st, d: o.d, walk: Math.max(1, Math.round(o.d * 1.3 / 80)) }));
+    if (!p.near.length) { const o = Object.values(stations).map(st => ({ st, d: Math.hypot(st.x - p.x, st.y - p.y) })).sort((a, b) => a.d - b.d)[0]; p.near = [{ st: o.st, d: o.d, walk: Math.round(o.d * 1.3 / 80) }]; }
+  });
 
   /* ---------------- canvas ---------------- */
   const cv = $('map'), ctx = cv.getContext('2d');
@@ -132,6 +149,8 @@
     ctx.fillStyle = c.water; ctx.beginPath();
     WATER_PTS.forEach((p, i) => (i ? ctx.lineTo(sx(p.x), sy(p.y)) : ctx.moveTo(sx(p.x), sy(p.y))));
     ctx.closePath(); ctx.fill();
+    ctx.fillStyle = c.bg;
+    LAND_PTS.forEach(poly => { ctx.beginPath(); poly.forEach((p, i) => (i ? ctx.lineTo(sx(p.x), sy(p.y)) : ctx.moveTo(sx(p.x), sy(p.y)))); ctx.closePath(); ctx.fill(); });
     ctx.strokeStyle = c.river; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     RIVER_PTS.forEach(r => {
       ctx.lineWidth = Math.max(1.5, r.w * S.cam.s * 55);
@@ -143,6 +162,7 @@
     { lat: 35.6715, lon: 139.6949, rx: 650, ry: 430 }, { lat: 35.7156, lon: 139.7745, rx: 520, ry: 330 },
     { lat: 35.6676, lon: 139.7195, rx: 480, ry: 320 }, { lat: 35.6485, lon: 139.7140, rx: 380, ry: 260 }
   ].map(p => Object.assign(p, TRS.proj(p.lat, p.lon)));
+  const LAND_PTS = (TRS_DATA.LAND || []).map(poly => poly.map(p => TRS.proj(p[0], p[1])));
   const WATER_PTS = TRS_DATA.WATER.map(p => TRS.proj(p[0], p[1]));
   const RIVER_PTS = TRS_DATA.RIVERS.map(r => ({ w: r.w, pts: r.pts.map(p => TRS.proj(p[0], p[1])) }));
 
@@ -186,7 +206,7 @@
     return w;
   }
 
-  function stationVisibleLines(st) { return st.lines.filter(x => isVisible(x.line)); }
+  function stationVisibleLines(st) { return st.lines.filter(x => isVisible(x.line) && !x.skipped); }
 
   function drawStations(w) {
     const c = T(), s = S.cam.s, focus = selectedLine();
@@ -303,46 +323,126 @@
     S.trains = arr; S.trainIdx = {};
     arr.forEach(t => { S.trainIdx[t.key] = t; });
   }
+  function badgePath(L, r) {
+    if (L.type === 'jr') roundRect(-r, -r, r * 2, r * 2, r * .36);
+    else if (L.type === 'pvt') roundRect(-r * 1.25, -r * .85, r * 2.5, r * 1.7, r * .85);
+    else { ctx.beginPath(); ctx.arc(0, 0, r, 0, 7); }
+  }
   function drawTrains() {
     S.trainScreen = [];
     if (!S.opts.trains) return;
-    const s = S.cam.s, focus = selectedLine();
-    const R = clamp(0.6 + 72 * s, 3.4, 12.5);
+    const s = S.cam.s, focus = selectedLine(), c = T();
+    const R = clamp(0.6 + 72 * s, 3.6, 12.5);
     S.trains.forEach(t => {
       const ss = lineSS[t.line.id]; if (!ss) return;
       const p = posScreen(t.line, ss, t.d);
-      if (p.x < -20 || p.y < -20 || p.x > S.W + 20 || p.y > S.H + 20) return;
-      const ang = p.ang + (t.dir === 1 ? Math.PI : 0);
-      t.sx = p.x; t.sy = p.y; t.ang = ang; t.R = R;
+      if (p.x < -40 || p.y < -40 || p.x > S.W + 40 || p.y > S.H + 40) return;
+      t.sx = p.x; t.sy = p.y; t.ang = p.ang + (t.dir === 1 ? Math.PI : 0); t.R = R;
       S.trainScreen.push(t);
     });
-    // draw: dwelling first then moving, selected last
     const selKey = S.sel && S.sel.type === 'train' ? S.sel.id : null;
     S.trainScreen.sort((a, b) => (a.key === selKey) - (b.key === selKey));
+    const dark = S.theme === 'dark';
     S.trainScreen.forEach(t => {
-      const L = t.line, c = T();
+      const L = t.line;
       ctx.globalAlpha = focus && focus !== L ? 0.22 : 1;
       ctx.save(); ctx.translate(t.sx, t.sy);
-      // heading pointer
+      // ---- train body (two cars), drawn along heading ----
       ctx.save(); ctx.rotate(t.ang);
-      ctx.beginPath(); ctx.moveTo(R + 4.5, 0); ctx.lineTo(R * .55, -R * .62); ctx.lineTo(R * .55, R * .62); ctx.closePath();
-      ctx.fillStyle = L.color; ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.4; ctx.stroke(); ctx.fill(); ctx.restore();
-      // body
-      ctx.fillStyle = L.color; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
-      if (L.type === 'jr') { roundRect(-R, -R, R * 2, R * 2, R * .38); } else { ctx.beginPath(); ctx.arc(0, 0, R, 0, 7); }
-      ctx.stroke(); ctx.fill();
-      if (L.type === 'toei') { ctx.beginPath(); ctx.arc(0, 0, R * .72, 0, 7); ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 1.1; ctx.stroke(); }
-      if (t.dwell) { ctx.beginPath(); ctx.arc(R * .72, -R * .72, R * .28, 0, 7); ctx.fillStyle = '#ffd24a'; ctx.fill(); }
-      if (R >= 8) {
+      const cl = R * 1.75, gap = R * 0.16, hw = R * 0.78;
+      const rear = -(cl + gap / 2), mid = gap / 2;
+      const body = dark ? '#f1f5f9' : '#ffffff';
+      const edge = dark ? 'rgba(4,8,12,.9)' : 'rgba(20,32,44,.85)';
+      ctx.lineWidth = Math.max(1, R * .16);
+      const car = (x0, x1, rf, rr) => {
+        ctx.beginPath();
+        ctx.moveTo(x0 + rr, -hw); ctx.lineTo(x1 - rf, -hw); ctx.quadraticCurveTo(x1, -hw, x1, -hw + rf);
+        ctx.lineTo(x1, hw - rf); ctx.quadraticCurveTo(x1, hw, x1 - rf, hw); ctx.lineTo(x0 + rr, hw);
+        ctx.quadraticCurveTo(x0, hw, x0, hw - rr); ctx.lineTo(x0, -hw + rr); ctx.quadraticCurveTo(x0, -hw, x0 + rr, -hw);
+        ctx.closePath();
+      };
+      [[rear, -gap / 2, R * .3, R * .45], [mid, cl + gap / 2, R * 1.05, R * .3]].forEach(([x0, x1, rf, rr], i) => {
+        car(x0, x1, rf, rr); ctx.fillStyle = body; ctx.fill(); ctx.strokeStyle = edge; ctx.stroke();
+        // coloured side stripe
+        ctx.save(); car(x0, x1, rf, rr); ctx.clip();
+        ctx.fillStyle = L.color; ctx.fillRect(x0, hw * .28, x1 - x0, hw * .72);
+        ctx.restore();
+        if (R >= 5.5) { // windows
+          ctx.fillStyle = 'rgba(20,38,58,.82)';
+          const n = 3, w = (x1 - x0 - R * .5 - (i ? R * .5 : 0)) / n;
+          for (let k = 0; k < n; k++) ctx.fillRect(x0 + R * .3 + k * w + w * .12, -hw * .62, w * .76, hw * .5);
+        }
+      });
+      // nose: windscreen + headlight
+      if (R >= 5.5) { ctx.fillStyle = 'rgba(20,38,58,.9)'; ctx.fillRect(cl + gap / 2 - R * .42, -hw * .55, R * .22, hw * 1.1 * .55); }
+      ctx.beginPath(); ctx.arc(cl + gap / 2 - R * .06, 0, Math.max(1, R * .17), 0, 7); ctx.fillStyle = '#ffd24a'; ctx.fill();
+      ctx.restore();
+      // ---- line badge on top of the train (upright) ----
+      const br = Math.max(3.4, R * .72);
+      ctx.save(); ctx.translate(0, -R * .05);
+      badgePath(L, br); ctx.fillStyle = L.color; ctx.fill();
+      ctx.lineWidth = Math.max(1, R * .17); ctx.strokeStyle = '#fff'; ctx.stroke();
+      if (L.type === 'toei') { ctx.beginPath(); ctx.arc(0, 0, br * .68, 0, 7); ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.stroke(); }
+      if (br >= 6.3) {
         ctx.fillStyle = L.textColor; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.font = `800 ${L.type === 'jr' ? R * 0.92 : R * 1.15}px Inter, system-ui, sans-serif`;
-        ctx.fillText(L.code, 0, 0.5);
-      }
-      if (t.key === selKey) {
-        ctx.beginPath(); ctx.arc(0, 0, R + 6, 0, 7); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
-        ctx.beginPath(); ctx.arc(0, 0, R + 10 + 2 * Math.sin(performance.now() / 250), 0, 7); ctx.strokeStyle = 'rgba(124,196,255,.8)'; ctx.stroke();
+        const two = L.code.length > 1;
+        ctx.font = `800 ${(two ? br * 0.98 : br * 1.2)}px Inter, system-ui, sans-serif`;
+        ctx.fillText(L.code, 0, br * .06);
       }
       ctx.restore();
+      // ---- loop direction pill (inner/outer, clockwise/counter-clockwise) ----
+      if (L.loop) {
+        const ccw = (t.dir === 0) === !!L.ccw0, big = R >= 7;
+        const label = (ccw ? '↺' : '↻') + (big ? L.pill[t.dir] : '');
+        const fs = Math.max(8, R * .98);
+        ctx.font = `800 ${fs}px Inter, "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif`;
+        const w = ctx.measureText(label).width + fs * .7, h = fs * 1.28, y = -R * 2.55;
+        ctx.fillStyle = t.dir === 0 ? '#ffffff' : '#10161d';
+        ctx.strokeStyle = t.dir === 0 ? '#10161d' : '#ffffff'; ctx.lineWidth = 1.2;
+        roundRect(-w / 2, y - h / 2, w, h, h / 2); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = t.dir === 0 ? '#10161d' : '#ffffff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(label, 0, y + fs * .05);
+      }
+      if (t.dwell) { // stopped at a station
+        ctx.beginPath(); ctx.arc(R * 1.5, -R * 1.0, Math.max(1.8, R * .26), 0, 7); ctx.fillStyle = '#ffb020'; ctx.fill();
+      }
+      if (t.key === selKey) {
+        ctx.beginPath(); ctx.arc(0, 0, R * 2.4, 0, 7); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+        ctx.beginPath(); ctx.arc(0, 0, R * 2.4 + 4 + 2 * Math.sin(performance.now() / 250), 0, 7); ctx.strokeStyle = 'rgba(124,196,255,.8)'; ctx.stroke();
+      }
+      ctx.restore();
+    });
+    ctx.globalAlpha = 1; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+  }
+
+  function drawPois() {
+    S.poiScreen = [];
+    if (!S.opts.poi) return;
+    const c = T(), s = S.cam.s, Rp = clamp(8 + 22 * s, 9, 16);
+    const selId = S.sel && S.sel.type === 'poi' ? S.sel.id : null;
+    const hovId = S.hover && S.hover.type === 'poi' ? S.hover.id : null;
+    const focus = selectedLine();
+    POI.forEach(p => {
+      if (S.poiHidden.has(p.cat)) return;
+      const x = sx(p.x), y = sy(p.y);
+      if (x < -30 || y < -30 || x > S.W + 30 || y > S.H + 30) return;
+      S.poiScreen.push({ p, x, y, r: Rp });
+      ctx.globalAlpha = focus ? 0.55 : 1;
+      const col = POI_CATS[p.cat].color;
+      ctx.beginPath(); ctx.arc(x, y + 1.5, Rp + 1.5, 0, 7); ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.fill();
+      ctx.beginPath(); ctx.arc(x, y, Rp, 0, 7); ctx.fillStyle = S.theme === 'dark' ? '#1b2633' : '#ffffff'; ctx.fill();
+      ctx.lineWidth = 2.4; ctx.strokeStyle = col; ctx.stroke();
+      ctx.font = `${Rp * 1.12}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#000';
+      ctx.fillText(p.emoji, x, y + Rp * .08);
+      if (p.id === selId) { ctx.beginPath(); ctx.arc(x, y, Rp + 6, 0, 7); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke(); }
+      if (s >= 0.1 || p.id === selId || p.id === hovId) {
+        const txt = nm(p);
+        ctx.font = '700 11.5px Inter, "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif';
+        ctx.textBaseline = 'alphabetic';
+        ctx.lineWidth = 3.5; ctx.strokeStyle = c.halo; ctx.lineJoin = 'round'; ctx.strokeText(txt, x, y + Rp + 13);
+        ctx.fillStyle = col; ctx.fillText(txt, x, y + Rp + 13);
+      }
     });
     ctx.globalAlpha = 1; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
   }
@@ -371,6 +471,7 @@
     drawBackground();
     const w = drawLines();
     drawStations(w);
+    drawPois();
     drawTrains();
     drawLabels();
     uiTick(now);
@@ -389,21 +490,22 @@
     if (now - lastUi < 250) return; lastUi = now;
     const n = S.trains.length;
     $('hudTrains').textContent = n + (n === 1 ? ' train running' : ' trains running');
-    $('hudPeriod').textContent = TRS.PERIOD_LABEL[TRS.periodOf(S.t)] + (n === 0 ? ' · out of service' : '');
+    $('hudPeriod').textContent = (S.dataMode === 'sim' ? TRS.PERIOD_LABEL[TRS.periodOf(S.t)] : 'Real timetable · ' + S.dataMode) + (n === 0 ? ' · out of service' : '');
     // line counts
     const counts = {}; S.trains.forEach(t => { counts[t.line.id] = (counts[t.line.id] || 0) + 1; });
     document.querySelectorAll('.lrow .cnt').forEach(el => { el.textContent = counts[el.dataset.l] || 0; });
+    renderCounts();
     refreshPanel();
   }
 
   /* ---------------- sidebar ---------------- */
-  const OPS = [['JR East', '#9ACD32'], ['Tokyo Metro', '#FF9500'], ['Toei Subway', '#6CBB5A']];
+  const OPS = [['JR East', '#9ACD32'], ['Tokyo Metro', '#FF9500'], ['Toei Subway', '#6CBB5A'], ['Private & Others', '#8F76D6']];
   function buildSidebar() {
     $('opChips').innerHTML = OPS.map(([op, col]) => `<button class="chip ${S.ops[op] ? 'on' : ''}" data-op="${op}"><i style="background:${col}"></i>${op}</button>`).join('');
     $('opChips').onclick = e => {
       const b = e.target.closest('.chip'); if (!b) return;
       const op = b.dataset.op; S.ops[op] = !S.ops[op];
-      lines.filter(L => L.op === op).forEach(L => (S.ops[op] ? S.hidden.delete(L.id) : S.hidden.add(L.id)));
+      lines.filter(L => L.grp === op).forEach(L => (S.ops[op] ? S.hidden.delete(L.id) : S.hidden.add(L.id)));
       syncSidebar();
     };
     renderLineList();
@@ -411,7 +513,7 @@
       const q = e.target.dataset.q; if (!q) return;
       S.hidden.clear();
       lines.forEach(L => {
-        if (q === 'none' || (q === 'jr' && L.type !== 'jr') || (q === 'subway' && L.type === 'jr')) S.hidden.add(L.id);
+        if (q === 'none' || (q === 'jr' && L.type !== 'jr') || (q === 'subway' && L.type !== 'metro' && L.type !== 'toei') || (q === 'pvt' && L.type !== 'pvt')) S.hidden.add(L.id);
       });
       syncSidebar();
     };
@@ -421,14 +523,14 @@
     const f = normQ($('lineFilter').value || '');
     let html = '';
     OPS.forEach(([op]) => {
-      const ls = lines.filter(L => L.op === op && (!f || normQ(L.en + L.ja + L.code + L.op + L.id).includes(f)));
+      const ls = lines.filter(L => L.grp === op && (!f || normQ(L.en + L.ja + L.code + L.op + L.id).includes(f)));
       if (!ls.length) return;
       html += `<div class="grp">${op}</div>`;
       ls.forEach(L => {
         html += `<div class="lrow ${S.hidden.has(L.id) ? 'off' : ''} ${S.sel && S.sel.type === 'line' && S.sel.id === L.id ? 'active' : ''}" data-id="${L.id}" style="--c:${L.color};--tc:${L.textColor}">
           <button class="eye" data-eye="${L.id}" aria-label="Toggle ${L.en}">${S.hidden.has(L.id) ? '' : '✓'}</button>
           ${bdg(L)}
-          <div class="nm"><b>${lineName(L)}</b><small>${nm2(L)} · ${L.n} stn</small></div>
+          <div class="nm"><b>${lineName(L)}</b><small>${L.type === 'pvt' ? L.op + ' · ' : ''}${nm2(L)} · ${L.n} stn</small></div>
           <span class="cnt" data-l="${L.id}" title="trains running">0</span></div>`;
       });
     });
@@ -446,7 +548,7 @@
     syncSidebar();
   }
   function syncSidebar() {
-    OPS.forEach(([op]) => { S.ops[op] = lines.some(L => L.op === op && !S.hidden.has(L.id)); });
+    OPS.forEach(([op]) => { S.ops[op] = lines.some(L => L.grp === op && !S.hidden.has(L.id)); });
     $('opChips').querySelectorAll('.chip').forEach(c => c.classList.toggle('on', S.ops[c.dataset.op]));
     renderLineList();
   }
@@ -457,6 +559,7 @@
     S.sel = { type, id };
     if (type === 'line') { S.hidden.delete(id); syncSidebar(); }
     else if (type === 'station') { stations[id].lines.forEach(x => S.hidden.delete(x.line.id)); syncSidebar(); }
+    else if (type === 'poi') { S.opts.poi = true; $('optPoi').checked = true; S.poiHidden.delete(poiById[id].cat); renderPoiChips(); }
     renderPanel(true);
     renderLineList();
     if (!fly) return;
@@ -464,6 +567,9 @@
     else if (type === 'station') {
       const st = stations[id], s = Math.max(S.cam.s, 0.32);
       flyTo(st.x + (window.innerWidth > 860 ? 170 / s : 0), st.y, s, 700);
+    } else if (type === 'poi') {
+      const p = poiById[id], s = Math.max(S.cam.s, 0.2);
+      flyTo(p.x + (window.innerWidth > 860 ? 170 / s : 0), p.y, s, 700);
     }
   }
   function clearSel() { S.sel = null; S.follow = null; $('panel').hidden = true; renderLineList(); }
@@ -474,6 +580,7 @@
     P.hidden = false;
     const top = P.scrollTop;
     if (S.sel.type === 'station') P.innerHTML = stationHTML(stations[S.sel.id]);
+    else if (S.sel.type === 'poi') P.innerHTML = poiHTML(poiById[S.sel.id]);
     else if (S.sel.type === 'line') P.innerHTML = lineHTML(byId[S.sel.id]);
     else { const t = S.trainIdx[S.sel.id]; if (!t) { clearSel(); return; } P.innerHTML = trainHTML(t); }
     if (!reset) P.scrollTop = top; else P.scrollTop = 0;
@@ -488,11 +595,22 @@
   }
   const closeBtn = '<button class="p-close" data-act="close" aria-label="Close">✕</button>';
 
-  function stationHTML(st) {
-    const xfers = st.lines.filter(x => true);
+  function poiHTML(p) {
+    const cat = POI_CATS[p.cat];
     return `<div class="p-head">${closeBtn}
-      <div class="xfer" style="gap:8px">${st.lines.map(x => bdg(x.line, x.num)).join('')}</div>
-      <div class="p-title">${nm(st)}</div><div class="p-sub">${nm2(st)}${st.lines.length > 1 ? ` · ${st.lines.length} lines` : ''}</div></div>
+      <div class="bdg"><span class="poi-ic" style="--c:${cat.color}">${p.emoji}</span><span class="poi-cat" style="--c:${cat.color}">${cat[S.lang]}</span></div>
+      <div class="p-title">${nm(p)}</div><div class="p-sub">${nm2(p)}</div></div>
+      <div class="p-body"><div style="font-size:14px;line-height:1.5">${p.desc}</div>
+        <div class="p-sec">Nearest stations</div>
+        ${p.near.map(n => `<div class="brow clickable" data-st="${n.st.id}"><div class="dest"><b>${nm(n.st)}</b><small>~${n.walk} min walk · ${Math.round(n.d / 10) * 10} m</small></div>
+          <span class="xfer" style="gap:4px;justify-content:flex-end">${n.st.lines.filter(x => !x.skipped).slice(0, 6).map(x => bdg(x.line, x.num, true)).join('')}</span></div>`).join('')}
+        <div class="btn-row"><button class="btn primary" data-act="zoompoi">Zoom to spot</button></div></div>`;
+  }
+  function stationHTML(st) {
+    const xfers = st.lines.filter(x => !x.skipped);
+    return `<div class="p-head">${closeBtn}
+      <div class="xfer" style="gap:8px">${st.lines.filter(x => !x.skipped).map(x => bdg(x.line, x.num)).join('')}</div>
+      <div class="p-title">${nm(st)}</div><div class="p-sub">${nm2(st)}${st.lines.filter(x => !x.skipped).length > 1 ? ` · ${st.lines.filter(x => !x.skipped).length} lines` : ''}</div></div>
       <div class="p-body">
         <div class="p-sec">Lines <span class="live" style="margin-left:8px;text-transform:none;letter-spacing:0">simulated</span></div>
         <div class="xfer">${xfers.map(x => `<div class="xf" data-line="${x.line.id}">${bdg(x.line, x.num, true)}<span>${lineName(x.line)}</span></div>`).join('')}</div>
@@ -506,7 +624,7 @@
     if (!rows.length) return '<div class="empty-note">No trains scheduled right now (out of service hours or lines hidden).</div>';
     return rows.slice(0, 14).map(b => {
       const L = b.line, st = stations[id], idx = st.lines.find(x => x.line === L).idx;
-      const dest = TRS.destName(L, b.dir, stations, S.lang);
+      const dest = L.loop ? TRS.destName(L, b.dir, stations, S.lang) : (S.lang === 'ja' ? stations[b.destId].ja : stations[b.destId].en);
       const inMin = Math.max(0, Math.round((b.times[0] - S.t) / 60));
       return `<div class="brow" data-line="${L.id}">${bdg(L, L.nums[idx], true)}
         <div class="dest"><b>${L.loop ? dest : (S.lang === 'ja' ? '' : 'For ') + dest + (S.lang === 'ja' ? ' 方面' : '')}</b><small>${lineName(L)}</small></div>
@@ -517,8 +635,8 @@
     const stopsHtml = L.ids.map((id, i) => {
       const st = stations[id], skip = L.skip.has(id);
       return `<div class="stp ${skip ? 'skip' : ''}" data-st="${id}" style="--c:${L.color}"><i></i><span class="nm">${nm(st)}</span>
-        <span class="ic">${st.lines.filter(x => x.line !== L).slice(0, 5).map(x => sym(x.line, true)).join('')}</span>
-        <span class="tm">${L.label(i)}</span></div>`;
+        <span class="ic">${st.lines.filter(x => x.line !== L && !x.skipped).slice(0, 5).map(x => sym(x.line, true)).join('')}</span>
+        <span class="tm">${skip ? 'pass' : L.label(i)}</span></div>`;
     }).join('');
     return `<div class="p-head" style="--c:${L.color}">${closeBtn}
       <div class="bdg">${sym(L)}<span class="p-sub">${L.op}</span></div>
@@ -531,10 +649,12 @@
   function lineLiveHTML(L) {
     const n = S.trains.filter(t => t.line === L).length;
     const hw = TRS.headwayAt(L, S.t);
-    return `<div class="kv"><div><b>${n}</b><small>trains now</small></div><div><b>${hw}′</b><small>headway</small></div><div><b>${(L.len / 1000).toFixed(1)} km</b><small>${L.n} stations</small></div></div>`;
+    const inn = S.trains.filter(t => t.line === L && t.dir === 0).length;
+    const split = L.loop ? `<div class="p-sub" style="margin:8px 0 0">↺ ${L.ccw0 ? L.dirNames[0] : L.dirNames[1]}: <b>${L.ccw0 ? inn : n - inn}</b> &nbsp;·&nbsp; ↻ ${L.ccw0 ? L.dirNames[1] : L.dirNames[0]}: <b>${L.ccw0 ? n - inn : inn}</b></div>` : '';
+    return `<div class="kv"><div><b>${n}</b><small>trains now</small></div><div><b>${hw}′</b><small>headway</small></div><div><b>${(L.len / 1000).toFixed(1)} km</b><small>${L.n} stations</small></div></div>` + split;
   }
   function trainHTML(t) {
-    const L = t.line, tpl = t.tpl, dest = TRS.destName(L, t.dir, stations, S.lang);
+    const L = t.line, tpl = t.tpl, dest = TRS.destName(L, t.dir, stations, S.lang, tpl);
     const local = S.t - t.start;
     const stopId = k => L.ids[tpl.stops[k] % L.n];
     const nextK = t.dwell ? t.k : t.next, nextSt = stations[stopId(Math.min(nextK, tpl.stops.length - 1))];
@@ -551,7 +671,7 @@
       const passed = k < (t.dwell ? t.k : t.next);
       const here = t.dwell && k === t.k;
       return `<div class="stp ${passed ? 'pass' : ''} ${here ? 'here' : ''}" data-st="${id}" style="--c:${L.color}"><i></i><span class="nm">${nm(st)}</span>
-        <span class="ic">${st.lines.filter(x => x.line !== L).slice(0, 4).map(x => sym(x.line, true)).join('')}</span><span class="tm">${hms(t.start + tpl.arr[k])}</span></div>`;
+        <span class="ic">${st.lines.filter(x => x.line !== L && !x.skipped).slice(0, 4).map(x => sym(x.line, true)).join('')}</span><span class="tm">${hms(t.start + tpl.arr[k])}</span></div>`;
     }).join('');
     return `<div class="p-head" style="--c:${L.color}">${closeBtn}
       <div class="bdg">${sym(L)}<span class="live">${S.follow === t.key ? 'following' : 'live (simulated)'}</span></div>
@@ -569,6 +689,7 @@
       if (a === 'close') clearSel();
       else if (a === 'zoomst') { const st = stations[S.sel.id]; flyTo(st.x + (window.innerWidth > 860 ? 170 / 0.5 : 0), st.y, 0.5, 700); }
       else if (a === 'follow') { S.follow = S.follow === S.sel.id ? null : S.sel.id; if (S.follow) { if (S.cam.s < 0.25) S.cam.s = 0.28; S.anim = null; } renderPanel(false); }
+      else if (a === 'zoompoi') { const p = poiById[S.sel.id]; flyTo(p.x + (window.innerWidth > 860 ? 170 / 0.5 : 0), p.y, 0.5, 700); }
       else if (a === 'line') { const t = S.trainIdx[S.sel.id]; if (t) selectItem('line', t.line.id, true); }
       return;
     }
@@ -579,9 +700,10 @@
   /* ---------------- search ---------------- */
   const index = [];
   Object.values(stations).forEach(st => {
-    const codes = st.lines.map(x => normQ(x.line.label(x.idx)));
+    const codes = st.lines.filter(x => !x.skipped).map(x => normQ(x.line.label(x.idx)));
     index.push({ type: 'station', id: st.id, en: normQ(st.en), ja: st.ja, codes, st });
   });
+  POI.forEach(p => index.push({ type: 'spot', id: p.id, en: normQ(p.en), ja: p.ja, codes: [], p }));
   lines.forEach(L => index.push({ type: 'line', id: L.id, en: normQ(L.en), ja: L.ja, codes: [normQ(L.code), normQ(L.id)], L }));
   let resItems = [], resSel = 0;
   function runSearch(q) {
@@ -611,6 +733,11 @@
           <div class="t"><b>${nm(st)}</b><small>${nm2(st)}</small></div>
           <span class="xfer" style="margin-left:6px;gap:4px">${st.lines.slice(0, 6).map(x => bdg(x.line, x.num, true)).join('')}</span><span class="kind">station</span></div>`;
       }
+      if (it.type === 'spot') {
+        const p = it.p;
+        return `<div class="res ${i === resSel ? 'sel' : ''}" data-i="${i}"><span class="poi-ic" style="--c:${POI_CATS[p.cat].color}">${p.emoji}</span>
+          <div class="t"><b>${nm(p)}</b><small>${nm2(p)}</small></div><span class="kind">spot</span></div>`;
+      }
       const L = it.L;
       return `<div class="res ${i === resSel ? 'sel' : ''}" data-i="${i}">${bdg(L)}<div class="t"><b>${nm(L)}</b><small>${nm2(L)} · ${L.op}</small></div><span class="kind">line</span></div>`;
     }).join('');
@@ -618,7 +745,7 @@
   function pickResult(i) {
     const it = resItems[i]; if (!it) return;
     $('results').hidden = true; $('q').blur();
-    selectItem(it.type, it.id, true);
+    selectItem(it.type === 'spot' ? 'poi' : it.type, it.id, true);
   }
   $('q').addEventListener('input', () => { resItems = runSearch($('q').value); resSel = 0; renderResults(); });
   $('q').addEventListener('focus', () => { if ($('q').value) { resItems = runSearch($('q').value); renderResults(); } });
@@ -679,27 +806,34 @@
 
   function pickAt(px, py) {
     let best = null, bd = 1e9;
-    (S.trainScreen || []).forEach(t => { const d = Math.hypot(t.sx - px, t.sy - py); if (d < Math.max(t.R + 5, 11) && d < bd) { bd = d; best = { type: 'train', t }; } });
+    (S.trainScreen || []).forEach(t => { const d = Math.hypot(t.sx - px, t.sy - py); if (d < Math.max(t.R * 2.1 + 3, 12) && d < bd) { bd = d; best = { type: 'train', t }; } });
     if (best) return best;
     S.stScreen.forEach(o => { const d = Math.hypot(o.x - px, o.y - py); if (d < Math.max(o.r + 5, 11) && d < bd) { bd = d; best = { type: 'station', o }; } });
+    if (best) return best;
+    (S.poiScreen || []).forEach(o => { const d = Math.hypot(o.x - px, o.y - py); if (d < o.r + 4 && d < bd) { bd = d; best = { type: 'poi', o }; } });
     return best;
   }
   function clickAt(px, py) {
     const h = pickAt(px, py);
     if (!h) { clearSel(); return; }
     if (h.type === 'train') { selectItem('train', h.t.key, false); }
+    else if (h.type === 'poi') selectItem('poi', h.o.p.id, false);
     else selectItem('station', h.o.st.id, false);
   }
   function hoverAt(px, py, e) {
     const h = pickAt(px, py), tip = $('tip');
+    S.hover = h && h.type === 'poi' ? { type: 'poi', id: h.o.p.id } : null;
     if (!h) { tip.hidden = true; cv.style.cursor = ''; return; }
     cv.style.cursor = 'pointer';
     let html;
     if (h.type === 'train') {
       const t = h.t, L = t.line, tpl = t.tpl, k = t.dwell ? t.k : t.next;
       const stn = stations[L.ids[tpl.stops[Math.min(k, tpl.stops.length - 1)] % L.n]];
-      html = `<div class="row">${bdg(L)}</div><b>${L.loop ? TRS.destName(L, t.dir, stations, S.lang) : (S.lang === 'ja' ? TRS.destName(L, t.dir, stations, 'ja') + ' 行き' : 'To ' + TRS.destName(L, t.dir, stations, 'en'))}</b>
+      html = `<div class="row">${bdg(L)}</div><b>${L.loop ? TRS.destName(L, t.dir, stations, S.lang) : (S.lang === 'ja' ? TRS.destName(L, t.dir, stations, 'ja', tpl) + ' 行き' : 'To ' + TRS.destName(L, t.dir, stations, 'en', tpl))}</b>
         <span style="color:var(--muted)">${t.dwell ? 'Stopped at' : 'Next:'} ${nm(stn)}</span>`;
+    } else if (h.type === 'poi') {
+      const p = h.o.p;
+      html = `<b>${p.emoji} ${nm(p)}</b><span style="color:var(--muted)">${nm2(p)} · ${POI_CATS[p.cat][S.lang]}</span>`;
     } else {
       const st = h.o.st;
       html = `<b>${nm(st)} <span style="color:var(--muted);font-weight:500">${nm2(st)}</span></b><div class="row">${h.o.vl.map(x => bdg(x.line, x.num, true)).join('')}</div>`;
@@ -729,18 +863,68 @@
   $('presets').onclick = e => { const b = e.target.closest('button'); if (!b) return; const v = PRESETS[+b.dataset.i][1]; S.t = v == null ? jstNow() : v; if (v == null) { S.speed = 1; [...$('speeds').children].forEach(c => c.classList.toggle('on', c.dataset.v === '1')); } };
 
   /* ---------------- misc controls ---------------- */
-  ['Trains', 'Names', 'Badges', 'Inter', 'Water'].forEach(k => {
+  ['Trains', 'Names', 'Badges', 'Inter', 'Water', 'Poi'].forEach(k => {
     $('opt' + k).addEventListener('change', e => { S.opts[k.toLowerCase()] = e.target.checked; });
   });
-  $('langBtn').onclick = () => { S.lang = S.lang === 'en' ? 'ja' : 'en'; $('langBtn').textContent = S.lang === 'en' ? 'EN' : '日本語'; document.documentElement.lang = S.lang; renderLineList(); renderPanel(false); };
+  $('langBtn').onclick = () => { renderPoiChips();  S.lang = S.lang === 'en' ? 'ja' : 'en'; $('langBtn').textContent = S.lang === 'en' ? 'EN' : '日本語'; document.documentElement.lang = S.lang; renderLineList(); renderPanel(false); };
   $('themeBtn').onclick = () => { S.theme = S.theme === 'dark' ? 'light' : 'dark'; document.documentElement.dataset.theme = S.theme; try { localStorage.setItem('trs-theme', S.theme); } catch (_) { } };
   $('menuBtn').onclick = () => { document.body.classList.toggle('menu'); $('scrim').hidden = !document.body.classList.contains('menu'); };
   $('scrim').onclick = () => { document.body.classList.remove('menu'); $('scrim').hidden = true; };
   window.addEventListener('resize', () => { resize(); });
 
+
+  /* ---------------- tourist-spot category chips ---------------- */
+  function renderPoiChips() {
+    $('poiChips').innerHTML = Object.entries(POI_CATS).map(([k, c]) =>
+      `<button class="chip ${S.poiHidden.has(k) ? '' : 'on'}" data-cat="${k}"><i style="background:${c.color}"></i>${c[S.lang]}</button>`).join('');
+  }
+  $('poiChips').addEventListener('click', e => {
+    const b = e.target.closest('.chip'); if (!b) return;
+    const k = b.dataset.cat; S.poiHidden.has(k) ? S.poiHidden.delete(k) : S.poiHidden.add(k); renderPoiChips();
+  });
+
+  /* ---------------- live "trains per line" card ---------------- */
+  function renderCounts() {
+    const card = $('countCard');
+    card.hidden = !S.countsOpen;
+    $('btnCounts').classList.toggle('on', S.countsOpen);
+    if (!S.countsOpen) return;
+    const cnt = {}, inner = {};
+    S.trains.forEach(t => { cnt[t.line.id] = (cnt[t.line.id] || 0) + 1; if (t.dir === 0) inner[t.line.id] = (inner[t.line.id] || 0) + 1; });
+    const grp = {}; S.trains.forEach(t => { grp[t.line.grp] = (grp[t.line.grp] || 0) + 1; });
+    const rows = lines.slice().sort((a, b) => (cnt[b.id] || 0) - (cnt[a.id] || 0) || a.order - b.order);
+    const max = Math.max(1, ...Object.values(cnt));
+    $('countHead').innerHTML = `<b>${S.trains.length}</b> trains running <span class="muted">· ${S.lang === 'ja' ? '路線別' : 'by line'}</span>`;
+    $('countGrp').innerHTML = OPS.map(([op, col]) => `<span class="gchip"><i style="background:${col}"></i>${op.replace(' Subway', '').replace(' & Others', '')} <b>${grp[op] || 0}</b></span>`).join('');
+    $('countRows').innerHTML = rows.map(L => {
+      const n = cnt[L.id] || 0, off = S.hidden.has(L.id);
+      const split = L.loop && n ? `<small class="split">↺${L.ccw0 ? (inner[L.id] || 0) : n - (inner[L.id] || 0)} ↻${L.ccw0 ? n - (inner[L.id] || 0) : (inner[L.id] || 0)}</small>` : '';
+      return `<div class="crow ${off ? 'off' : ''}" data-line="${L.id}" style="--c:${L.color}">${bdg(L, null, true)}
+        <span class="cn">${nm(L)}${split}</span><span class="bar"><i style="width:${(n / max * 100).toFixed(1)}%"></i></span><b class="cc">${n}</b></div>`;
+    }).join('');
+  }
+  $('btnCounts').onclick = () => { S.countsOpen = !S.countsOpen; renderCounts(); };
+  $('countClose').onclick = () => { S.countsOpen = false; renderCounts(); };
+  $('countRows').addEventListener('click', e => { const r = e.target.closest('.crow'); if (r) selectItem('line', r.dataset.line, true); });
+
+  /* ---------------- real timetable (optional, from data/timetable.json) ---------------- */
+  function setDataMode(mode) {
+    S.dataMode = mode;
+    if (mode === 'sim' || !ttData) { lines.forEach(L => { L.real = null; }); }
+    else TRS.setRealTrips(net, ttData, mode);
+    const real = lines.filter(L => L.real).length;
+    document.querySelectorAll('#ttBtns button').forEach(b => b.classList.toggle('on', b.dataset.m === mode));
+    $('ttNote').textContent = mode === 'sim' ? 'Generated from line frequency, speed and dwell time.' : `Real trips on ${real}/${lines.length} lines (others simulated). Source: ODPT — ${ttData.meta && ttData.meta.generated || ''}`;
+  }
+  if (ttData) {
+    $('ttSection').hidden = false;
+    $('ttBtns').onclick = e => { const b = e.target.closest('button'); if (b) setDataMode(b.dataset.m); };
+    setDataMode(ttData.lines && Object.values(ttData.lines).some(x => x.weekday) ? 'weekday' : 'sim');
+  }
+
   /* ---------------- boot ---------------- */
   try { const th = localStorage.getItem('trs-theme'); if (th) { S.theme = th; document.documentElement.dataset.theme = th; } } catch (_) { }
-  resize(); fitAll(false); buildSidebar();
+  resize(); fitAll(false); buildSidebar(); renderPoiChips();
   const q0 = new URLSearchParams(location.search);
   if (q0.get('t')) S.t = clamp(+q0.get('t') * 3600, TRS.SERVICE_START, TRS.SERVICE_END - 1);
   if (q0.get('line') && byId[q0.get('line')]) selectItem('line', q0.get('line'), true);

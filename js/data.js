@@ -251,7 +251,7 @@ kokuritsukyogijo|Kokuritsu-Kyogijo|国立競技場|35.6800|139.7141
   // type: jr | metro | toei
   const LINE_SRC = [
     { id: 'JY', code: 'JY', type: 'jr', op: 'JR East', en: 'Yamanote Line', ja: '山手線', color: '#9ACD32', loop: true,
-      dirs: ['Inner loop 内回り', 'Outer loop 外回り'], v: 46, dwell: 25, freq: [2.5, 4, 6], first: 4.6, last: 24.9,
+      dirs: ['Inner loop 内回り', 'Outer loop 外回り'], pill: ['内', '外'], ccw0: true, v: 46, dwell: 25, freq: [2.5, 4, 6], first: 4.6, last: 24.9,
       st: 'tokyo:1 kanda akihabara okachimachi ueno uguisudani nippori nishinippori tabata komagome sugamo otsuka ikebukuro mejiro takadanobaba shinokubo shinjuku yoyogi harajuku shibuya ebisu meguro gotanda osaki shinagawa takanawagw tamachi hamamatsucho shimbashi yurakucho' },
     { id: 'JC', code: 'JC', type: 'jr', op: 'JR East', en: 'Chuo Line (Rapid)', ja: '中央線(快速)', color: '#F15A22', v: 62, dwell: 28, freq: [3, 5, 9], first: 4.7, last: 24.6,
       skip: 'musashisakai higashikoganei musashikoganei',
@@ -287,17 +287,22 @@ kokuritsukyogijo|Kokuritsu-Kyogijo|国立競技場|35.6800|139.7141
     { id: 'S', code: 'S', type: 'toei', op: 'Toei Subway', en: 'Shinjuku Line', ja: '新宿線', color: '#6CBB5A', v: 44, dwell: 22, freq: [4, 6, 9], first: 5.0, last: 24.4,
       st: 'shinjuku:1 shinjukusanchome akebonobashi ichigaya kudanshita jimbocho ogawamachi iwamotocho bakuroyokoyama hamacho morishita kikukawa sumiyoshi nishiojima ojima higashiojima funabori' },
     { id: 'E', code: 'E', type: 'toei', op: 'Toei Subway', en: 'Oedo Line', ja: '大江戸線', color: '#B6007A', loop: true,
-      dirs: ['Ring (via Iidabashi) 右回り', 'Ring (via Roppongi) 左回り'], v: 40, dwell: 22, freq: [4, 6, 9], first: 5.0, last: 24.4,
+      dirs: ['Clockwise 右回り (via Iidabashi)', 'Counter-clockwise 左回り (via Roppongi)'], pill: ['右', '左'], ccw0: false, v: 40, dwell: 22, freq: [4, 6, 9], first: 5.0, last: 24.4,
       st: 'tochomae:28 shinjukunishiguchi:1 higashishinjuku wakamatsukawada ushigomeyanagicho ushigomekagurazaka iidabashi kasuga hongosanchome uenookachimachi shinokachimachi kuramae ryogoku morishita kiyosumi monzennakacho tsukishima kachidoki tsukijishijo shiodome daimon akabanebashi azabujuban roppongi aoyamaitchome kokuritsukyogijo yoyogi shinjuku:27' }
   ];
 
   // Rough Tokyo Bay / river sketches for the backdrop  [lat, lon]
   const WATER = [
-    [35.715, 140.030], [35.700, 139.990], [35.672, 139.935], [35.652, 139.885], [35.645, 139.835],
-    [35.636, 139.805], [35.627, 139.785], [35.610, 139.780], [35.590, 139.795], [35.575, 139.790],
-    [35.562, 139.765], [35.530, 139.755], [35.505, 139.730], [35.480, 139.685], [35.450, 139.655],
-    [35.400, 139.645], [35.300, 139.640], [35.300, 140.200], [35.560, 140.200], [35.560, 140.110],
-    [35.610, 140.090], [35.650, 140.050], [35.685, 140.040]
+    [35.690, 139.990], [35.675, 139.968], [35.655, 139.950], [35.648, 139.925], [35.627, 139.905],
+    [35.622, 139.870], [35.633, 139.835], [35.636, 139.805], [35.628, 139.785], [35.610, 139.775],
+    [35.588, 139.795], [35.566, 139.812], [35.540, 139.800], [35.530, 139.765], [35.510, 139.735],
+    [35.480, 139.690], [35.455, 139.660], [35.400, 139.645], [35.300, 139.640], [35.300, 140.200],
+    [35.560, 140.200], [35.560, 140.120], [35.600, 140.100], [35.635, 140.060], [35.658, 140.040]
+  ];
+  // reclaimed land drawn over the water (Odaiba/Aomi/Ariake, Haneda)
+  const LAND = [
+    [[35.652, 139.760], [35.652, 139.805], [35.622, 139.815], [35.618, 139.775], [35.632, 139.762]],
+    [[35.572, 139.745], [35.572, 139.800], [35.535, 139.800], [35.530, 139.748]]
   ];
   const RIVERS = [
     { name: 'Arakawa', w: 5, pts: [[35.800, 139.715], [35.790, 139.725], [35.772, 139.765], [35.752, 139.800], [35.730, 139.842], [35.700, 139.858], [35.668, 139.867], [35.645, 139.872]] },
@@ -306,5 +311,5 @@ kokuritsukyogijo|Kokuritsu-Kyogijo|国立競技場|35.6800|139.7141
     { name: 'Kanda', w: 2, pts: [[35.705, 139.625], [35.703, 139.690], [35.708, 139.722], [35.700, 139.752], [35.695, 139.775]] }
   ];
 
-  g.TRS_DATA = { STATION_SRC, LINE_SRC, WATER, RIVERS };
+  g.TRS_DATA = { STATION_SRC, LINE_SRC, WATER, RIVERS, LAND };
 })(window);

@@ -1,0 +1,5 @@
+# ODPT credentials and raw API dumps must never be committed
+.env
+.env.*
+tools/odpt/raw/
+node_modules/
