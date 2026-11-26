@@ -21,7 +21,7 @@
     follow: null,
     opts: { trains: true, names: true, badges: true, inter: false, water: true, poi: true },
     poiCats: {}, dataMode: 'sim', countsOpen: false,
-    cam: { x: -2600, y: 500, s: 0.06 }, W: 800, H: 600, dpr: 1,
+    cam: { x: -2600, y: 500, s: 0.06 }, W: 800, H: 600, dpr: 1, ui: 1,
     anim: null, trains: [], trainIdx: {}, stScreen: [], hover: null, dragging: false
   };
   const MIN_S = 0.012, MAX_S = 2.4;
@@ -64,6 +64,8 @@
     const r = $('stage').getBoundingClientRect();
     S.dpr = Math.min(window.devicePixelRatio || 1, 2);
     S.W = r.width; S.H = r.height;
+    // UI scale for everything drawn on the canvas: smaller on phones
+    S.ui = Math.min(window.innerWidth, window.innerHeight) <= 560 || window.innerWidth <= 860 ? 0.7 : 1;
     cv.width = Math.round(S.W * S.dpr); cv.height = Math.round(S.H * S.dpr);
   }
   const sx = x => (x - S.cam.x) * S.cam.s + S.W / 2;
@@ -169,7 +171,7 @@
   let lineSS = {};
   function drawLines() {
     const c = T(), s = S.cam.s;
-    const w = clamp(1.6 + 38 * s, 2.4, 8.5), spacing = w + 1.2;
+    const u = S.ui, w = clamp(1.6 + 38 * s, 2.4, 8.5) * u, spacing = w + 1.2 * u;
     const focus = selectedLine();
     ctx.lineJoin = 'round'; ctx.lineCap = 'round';
     lineSS = {};
@@ -180,7 +182,7 @@
       const lw = L.type === 'jr' ? w * 1.12 : w * 0.92;
       ctx.globalAlpha = focus && focus !== L ? 0.16 : 1;
       ctx.beginPath(); ss.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
-      ctx.strokeStyle = c.casing; ctx.lineWidth = lw + 2.6; ctx.stroke();
+      ctx.strokeStyle = c.casing; ctx.lineWidth = lw + 2.6 * u; ctx.stroke();
       ctx.strokeStyle = L.color; ctx.lineWidth = lw; ctx.stroke();
       if (L.type === 'jr' && lw >= 4) {
         ctx.setLineDash([lw * 1.3, lw * 1.3]); ctx.strokeStyle = 'rgba(255,255,255,.75)'; ctx.lineWidth = Math.max(1, lw * 0.22); ctx.stroke(); ctx.setLineDash([]);
@@ -210,7 +212,7 @@
 
   function drawStations(w) {
     const c = T(), s = S.cam.s, focus = selectedLine();
-    const base = clamp(1.6 + 16 * s, 2.4, 7.5);
+    const base = clamp(1.6 + 16 * s, 2.4, 7.5) * S.ui;
     S.stScreen = [];
     const margin = 40;
     Object.values(stations).forEach(st => {
@@ -244,7 +246,7 @@
     if (!S.opts.names) return;
     const c = T(), s = S.cam.s, focus = selectedLine();
     const showBadges = S.opts.badges && (s >= 0.2 || (focus && s >= 0.07));
-    const fs = clamp(11 + s * 14, 11, 14);
+    const u = S.ui, fs = clamp(11 + s * 14, 11, 14) * u, FN = 'Inter, "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif';
     const placed = [];
     const items = S.stScreen.map(o => {
       let pri = o.vl.length * 10 + (o.vl.some(v => v.line.type === 'jr') ? 4 : 0);
@@ -268,12 +270,12 @@
         const vl = focus ? o.vl.filter(v => v.line === focus) : o.vl;
         badges = vl.map(v => ({ v, label: v.line.label(v.idx) }));
       }
-      ctx.font = '700 9.5px Inter, system-ui, sans-serif';
-      const bw = badges.map(b => ctx.measureText(b.label).width + 8);
+      ctx.font = `700 ${9.5 * u}px Inter, system-ui, sans-serif`;
+      const bw = badges.map(b => ctx.measureText(b.label).width + 8 * u);
       const rowW = bw.reduce((a, b) => a + b + 3, 0);
       const showSub = s >= 0.3;
-      const blockW = Math.max(tw, rowW), blockH = fs + 3 + (showSub ? 12 : 0) + (badges.length ? 16 : 0);
-      const gap = o.r + 5;
+      const blockW = Math.max(tw, rowW), blockH = fs + 3 + (showSub ? 12 * u : 0) + (badges.length ? 16 * u : 0);
+      const gap = o.r + 5 * u;
       const cand = [
         { x: o.x + gap, y: o.y - blockH / 2, a: 'l' }, { x: o.x - gap - blockW, y: o.y - blockH / 2, a: 'r' },
         { x: o.x - blockW / 2, y: o.y - gap - blockH, a: 'c' }, { x: o.x - blockW / 2, y: o.y + gap, a: 'c' }
@@ -289,22 +291,22 @@
       ctx.textAlign = k.a === 'r' ? 'right' : k.a === 'c' ? 'center' : 'left';
       ctx.font = `600 ${fs}px Inter, "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif`;
       const ty = k.y + fs;
-      ctx.lineWidth = 3.5; ctx.strokeStyle = c.halo; ctx.lineJoin = 'round'; ctx.strokeText(text, alignX, ty);
+      ctx.lineWidth = 3.5 * u; ctx.strokeStyle = c.halo; ctx.lineJoin = 'round'; ctx.strokeText(text, alignX, ty);
       ctx.fillStyle = c.label; ctx.fillText(text, alignX, ty);
       let yy = ty;
       if (showSub) {
-        ctx.font = '500 10.5px Inter, "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif';
-        yy += 12; ctx.lineWidth = 3; ctx.strokeText(nm2(o.st), alignX, yy); ctx.fillStyle = c.sub; ctx.fillText(nm2(o.st), alignX, yy);
+        ctx.font = `500 ${10.5 * u}px ${FN}`;
+        yy += 12 * u; ctx.lineWidth = 3; ctx.strokeText(nm2(o.st), alignX, yy); ctx.fillStyle = c.sub; ctx.fillText(nm2(o.st), alignX, yy);
       }
       if (badges.length) {
-        yy += 5;
+        yy += 5 * u;
         let bx = k.a === 'r' ? k.x + blockW - rowW + 3 : k.a === 'c' ? k.x + blockW / 2 - rowW / 2 : k.x;
-        ctx.textAlign = 'center'; ctx.font = '700 9.5px Inter, system-ui, sans-serif';
+        ctx.textAlign = 'center'; ctx.font = `700 ${9.5 * u}px Inter, system-ui, sans-serif`;
         badges.forEach((b, i) => {
           const L = b.v.line;
-          ctx.fillStyle = L.color; roundRect(bx, yy, bw[i], 13, L.type === 'jr' ? 3.5 : 6.5); ctx.fill();
+          ctx.fillStyle = L.color; roundRect(bx, yy, bw[i], 13 * u, (L.type === 'jr' ? 3.5 : 6.5) * u); ctx.fill();
           ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 1; ctx.stroke();
-          ctx.fillStyle = L.textColor; ctx.fillText(b.label, bx + bw[i] / 2, yy + 9.8);
+          ctx.fillStyle = L.textColor; ctx.fillText(b.label, bx + bw[i] / 2, yy + 9.8 * u);
           bx += bw[i] + 3;
         });
       }
@@ -334,7 +336,7 @@
     S.trainScreen = [];
     if (!S.opts.trains) return;
     const s = S.cam.s, focus = selectedLine(), c = T();
-    const R = clamp(0.6 + 72 * s, 3.6, 12.5);
+    const R = clamp(0.6 + 72 * s, 3.6, 12.5) * S.ui;
     S.trains.forEach(t => {
       const ss = lineSS[t.line.id]; if (!ss) return;
       const p = posScreen(t.line, ss, t.d);
@@ -421,7 +423,7 @@
   function drawPois() {
     S.poiScreen = [];
     if (!S.opts.poi) return;
-    const c = T(), s = S.cam.s, Rp = clamp(8 + 22 * s, 9, 16);
+    const c = T(), s = S.cam.s, Rp = clamp(8 + 22 * s, 9, 16) * S.ui;
     const selId = S.sel && S.sel.type === 'poi' ? S.sel.id : null;
     const hovId = S.hover && S.hover.type === 'poi' ? S.hover.id : null;
     const focus = selectedLine();
@@ -441,10 +443,10 @@
       if (p.id === selId) { ctx.beginPath(); ctx.arc(x, y, Rp + 6, 0, 7); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke(); }
       if (s >= 0.1 || p.id === selId || p.id === hovId) {
         const txt = nm(p);
-        ctx.font = '700 11.5px Inter, "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif';
+        ctx.font = `700 ${11.5 * S.ui}px Inter, "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif`;
         ctx.textBaseline = 'alphabetic';
-        ctx.lineWidth = 3.5; ctx.strokeStyle = c.halo; ctx.lineJoin = 'round'; ctx.strokeText(txt, x, y + Rp + 13);
-        ctx.fillStyle = col; ctx.fillText(txt, x, y + Rp + 13);
+        ctx.lineWidth = 3.5; ctx.strokeStyle = c.halo; ctx.lineJoin = 'round'; ctx.strokeText(txt, x, y + Rp + 13 * S.ui);
+        ctx.fillStyle = col; ctx.fillText(txt, x, y + Rp + 13 * S.ui);
       }
     });
     ctx.globalAlpha = 1; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
@@ -927,7 +929,8 @@
 
   /* ---------------- boot ---------------- */
   try { const th = localStorage.getItem('trs-theme'); if (th) { S.theme = th; document.documentElement.dataset.theme = th; } } catch (_) { }
-  resize(); fitAll(false); buildSidebar(); renderPoiChips();
+  resize(); if (S.ui < 1) $('q').placeholder = 'Search station, line, spot…';
+  fitAll(false); buildSidebar(); renderPoiChips();
   const q0 = new URLSearchParams(location.search);
   if (q0.get('t')) S.t = clamp(+q0.get('t') * 3600, TRS.SERVICE_START, TRS.SERVICE_END - 1);
   if (q0.get('line') && byId[q0.get('line')]) selectItem('line', q0.get('line'), true);
