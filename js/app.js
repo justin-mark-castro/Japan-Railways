@@ -80,7 +80,7 @@
     S.dpr = Math.min(window.devicePixelRatio || 1, 2);
     S.W = r.width; S.H = r.height;
     // UI scale for everything drawn on the canvas: smaller on phones
-    S.ui = Math.min(window.innerWidth, window.innerHeight) <= 560 || window.innerWidth <= 860 ? 0.7 : 1;
+    S.ui = Math.min(window.innerWidth, window.innerHeight) <= 560 || window.innerWidth <= 860 ? 0.7 : 0.85;
     cv.width = Math.round(S.W * S.dpr); cv.height = Math.round(S.H * S.dpr);
   }
   const sx = x => (x - S.cam.x) * S.cam.s + S.W / 2;
@@ -1089,7 +1089,7 @@
 
   /* ---------------- boot ---------------- */
   try { const th = localStorage.getItem('trs-theme'); if (th) { S.theme = th; document.documentElement.dataset.theme = th; } } catch (_) { }
-  resize(); if (S.ui < 1) $('q').placeholder = 'Search station, line, spot…';
+  resize(); if (S.ui < 0.8) $('q').placeholder = 'Search station, line, spot…';
   fitAll(false); computeOps(); buildIndex(); buildSidebar(); renderPoiChips(); updateArea(); updateAreaLabel();
   const q0 = new URLSearchParams(location.search);
   if (q0.get('t')) S.t = clamp(+q0.get('t') * 3600, TRS.SERVICE_START, TRS.SERVICE_END - 1);

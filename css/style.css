@@ -1,7 +1,7 @@
 :root{
   --bg:#0c1117; --bg2:#121a23; --panel:#161f2a; --panel2:#1c2733; --line:#263342;
   --text:#e8eef5; --muted:#8fa1b5; --accent:#7cc4ff; --shadow:0 10px 30px rgba(0,0,0,.45);
-  --radius:14px; --topH:60px; --botH:74px; --sideW:300px;
+  --radius:12px; --topH:52px; --botH:64px; --sideW:272px;
   font-family:"Inter","SF Pro Text","Segoe UI","Hiragino Sans","Noto Sans JP","Yu Gothic",system-ui,sans-serif;
 }
 [data-theme="light"]{
@@ -17,7 +17,7 @@ button,input{font:inherit;color:inherit}
 .brand{display:flex;align-items:center;gap:10px;min-width:max-content}
 .brand-mark{display:grid;place-items:center;width:34px;height:34px;border-radius:9px;background:#9ACD32;color:#111;font-weight:800;font-size:14px;letter-spacing:.3px;box-shadow:0 0 0 2px rgba(255,255,255,.15) inset}
 .brand-text{display:flex;flex-direction:column;line-height:1.1}
-.brand-text b{font-size:15px;letter-spacing:.2px}
+.brand-text b{font-size:14px;letter-spacing:.2px}
 .brand-text small{font-size:11px;color:var(--muted);margin-top:3px}
 .search{position:relative;flex:1;min-width:0;max-width:620px;margin:0 auto;display:flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:0 10px;height:40px;color:var(--muted)}
 .search:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 25%,transparent)}
@@ -108,7 +108,7 @@ kbd{font-size:11px;border:1px solid var(--line);border-radius:6px;padding:1px 6p
 .tip .row{display:flex;gap:4px;flex-wrap:wrap}
 
 /* panel */
-#panel{position:absolute;right:14px;top:calc(var(--topH) + 12px);bottom:calc(var(--botH) + 12px);width:352px;max-width:calc(100vw - 28px);background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:auto;z-index:25;scrollbar-width:thin}
+#panel{position:absolute;right:14px;top:calc(var(--topH) + 12px);bottom:calc(var(--botH) + 12px);width:320px;font-size:13px;max-width:calc(100vw - 28px);background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:auto;z-index:25;scrollbar-width:thin}
 #panel[hidden]{display:none}
 .p-head{position:sticky;top:0;background:var(--panel);padding:16px 16px 12px;border-bottom:1px solid var(--line);z-index:2}
 .p-close{position:absolute;right:10px;top:10px;width:30px;height:30px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);cursor:pointer}
@@ -155,9 +155,9 @@ kbd{font-size:11px;border:1px solid var(--line);border-radius:6px;padding:1px 6p
 
 /* clock bar */
 #clockbar{grid-area:bot;display:flex;align-items:center;gap:16px;padding:0 16px;background:var(--bg2);border-top:1px solid var(--line);z-index:30}
-.play{width:44px;height:44px;border-radius:50%;border:0;background:var(--accent);color:#06121e;font-size:14px;cursor:pointer;font-weight:800;flex:none}
+.play{width:38px;height:38px;border-radius:50%;border:0;background:var(--accent);color:#06121e;font-size:14px;cursor:pointer;font-weight:800;flex:none}
 .clock{display:flex;align-items:baseline;gap:2px;min-width:118px;font-variant-numeric:tabular-nums}
-.clock b{font-size:30px;letter-spacing:.5px}
+.clock b{font-size:26px;letter-spacing:.5px}
 .clock small{font-size:15px;color:var(--muted)}
 .clock span{font-size:11px;color:var(--muted);margin-left:6px;border:1px solid var(--line);border-radius:6px;padding:1px 5px}
 #scrub{flex:1;min-width:80px;accent-color:var(--accent);height:28px}
@@ -243,7 +243,7 @@ kbd{font-size:11px;border:1px solid var(--line);border-radius:6px;padding:1px 6p
 .hudbtn{background:color-mix(in srgb,var(--panel) 88%,transparent);backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:999px;padding:5px 12px;font-size:12px;cursor:pointer;display:flex;gap:6px;align-items:center}
 .hudbtn span{background:none;border:0;padding:0;backdrop-filter:none}
 .hudbtn:hover,.hudbtn.on{border-color:var(--accent)}
-.card{position:absolute;left:14px;top:54px;width:330px;max-height:calc(100% - 140px);display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);z-index:12;overflow:hidden}
+.card{position:absolute;left:14px;top:54px;width:300px;max-height:calc(100% - 140px);display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);z-index:12;overflow:hidden}
 .card[hidden]{display:none}
 .card-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px 6px;font-size:14px}
 .card-head b{font-size:20px}.muted{color:var(--muted);font-size:12px}
