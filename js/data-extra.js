@@ -221,10 +221,99 @@ kamimachi|Kamimachi|上町|35.6555|139.6500
 miyanosaka|Miyanosaka|宮の坂|35.6585|139.6470
 yamashita|Yamashita|山下|35.6612|139.6445
 matsubara|Matsubara|松原|35.6645|139.6425
+akadoshogakkomae|Akado-shogakkomae|赤土小学校前|35.7430|139.7700
+adachiodai|Adachi-odai|足立小台|35.7580|139.7690
+ogiohashi|Ogi-ohashi|扇大橋|35.7655|139.7640
+koya|Koya|高野|35.7740|139.7630
+kohoku|Kohoku|江北|35.7810|139.7600
+nishiaraidaishinishi|Nishiaraidaishi-nishi|西新井大師西|35.7880|139.7580
+yazaike|Yazaike|谷在家|35.7960|139.7570
+tonerikoen|Toneri-koen|舎人公園|35.8035|139.7600
+toneri|Toneri|舎人|35.8100|139.7655
+minumadaishinsuikoen|Minumadai-shinsuikoen|見沼代親水公園|35.8144|139.7708
+tamacenter|Tama-Center|多摩センター|35.6247|139.4235
+matsugaya|Matsugaya|松が谷|35.6310|139.4180
+otsukateikyo|Otsuka Teikyo-Daigaku|大塚・帝京大学|35.6392|139.4097
+chuomeisei|Chuo-Daigaku-Meisei-Daigaku|中央大学・明星大学|35.6455|139.4070
+tamadobutsukoen|Tama-dobutsukoen|多摩動物公園|35.6520|139.4060
+hodokubo|Hodokubo|程久保|35.6580|139.4090
+takahatafudo|Takahatafudo|高幡不動|35.6624|139.4125
+manganji|Manganji|万願寺|35.6770|139.4190
+koshukaido|Koshu-Kaido|甲州街道|35.6860|139.4145
+shibasakitaiikukan|Shibasaki-Taiikukan|柴崎体育館|35.6920|139.4130
+tachikawaminami|Tachikawa-Minami|立川南|35.6967|139.4137
+tachikawakita|Tachikawa-Kita|立川北|35.7001|139.4141
+takamatsu|Takamatsu|高松|35.7060|139.4125
+tachihi|Tachihi|立飛|35.7130|139.4130
+izumitaiikukan|Izumi-Taiikukan|泉体育館|35.7195|139.4140
+sunagawananaban|Sunagawa-Nanaban|砂川七番|35.7260|139.4150
+tamagawajosui|Tamagawa-Josui|玉川上水|35.7330|139.4150
+sakurakaido|Sakura-Kaido|桜街道|35.7385|139.4170
+kamikitadai|Kamikitadai|上北台|35.7425|139.4205
+ofuna|Ofuna|大船|35.3538|139.5313
+fujimicho|Fujimicho|富士見町|35.3490|139.5260
+shonanmachiya|Shonan-Machiya|湘南町屋|35.3440|139.5200
+shonanfukasawa|Shonan-Fukasawa|湘南深沢|35.3370|139.5120
+nishikamakura|Nishi-Kamakura|西鎌倉|35.3290|139.5030
+kataseyama|Kataseyama|片瀬山|35.3195|139.4940
+mejiroyamashita|Mejiroyamashita|目白山下|35.3140|139.4905
+shonanenoshima|Shonan-Enoshima|湘南江の島|35.3114|139.4888
+chibaminato|Chibaminato|千葉みなと|35.6001|140.1050
+chibashiyakushomae|Shiyakusho-mae|市役所前|35.6064|140.1105
+chiba|Chiba|千葉|35.6131|140.1133
+chibasakaecho|Sakaecho|栄町|35.6085|140.1150
+yoshikawakoen|Yoshikawakoen|葭川公園|35.6040|140.1195
+kenchomae|Kencho-mae|県庁前|35.6030|140.1240
+chibakoen|Chibakoen|千葉公園|35.6180|140.1190
+sakusabe|Sakusabe|作草部|35.6225|140.1250
+tendai|Tendai|天台|35.6275|140.1330
+anagawa|Anagawa|穴川|35.6330|140.1400
+sportscenter|Sports Center|スポーツセンター|35.6390|140.1450
+chibadobutsukoen|Dobutsukoen|動物公園|35.6440|140.1500
+mitsuwadai|Mitsuwadai|みつわ台|35.6440|140.1560
+tsuga|Tsuga|都賀|35.6385|140.1610
+sakuragi|Sakuragi|桜木|35.6455|140.1690
+oguradai|Oguradai|小倉台|35.6535|140.1720
+chishirodaikita|Chishirodai-Kita|千城台北|35.6600|140.1760
+chishirodai|Chishirodai|千城台|35.6655|140.1790
+shinsugita|Shin-Sugita|新杉田|35.3863|139.6201
+nambushijo|Nambu-Shijo|南部市場|35.3810|139.6290
+torihama|Torihama|鳥浜|35.3770|139.6355
+namikikita|Namiki-Kita|並木北|35.3720|139.6385
+namikichuo|Namiki-Chuo|並木中央|35.3665|139.6380
+koura|Koura|幸浦|35.3615|139.6385
+sangyoshinko|Sangyo-Shinko-Center|産業振興センター|35.3560|139.6370
+fukuura|Fukuura|福浦|35.3510|139.6340
+shidaiigakubu|Shidai-Igakubu|市大医学部|35.3450|139.6335
+hakkeijima|Hakkeijima|八景島|35.3390|139.6420
+uminokoenshibaguchi|Uminokoen-Shibaguchi|海の公園柴口|35.3340|139.6440
+uminokoenminamiguchi|Uminokoen-Minamiguchi|海の公園南口|35.3290|139.6420
+nojimakoen|Nojimakoen|野島公園|35.3280|139.6350
+kanazawahakkei|Kanazawa-Hakkei|金沢八景|35.3370|139.6195
+fujisawa|Fujisawa|藤沢|35.3388|139.4903
+ishigami|Ishigami|石上|35.3340|139.4885
+yanagikoji|Yanagikoji|柳小路|35.3300|139.4890
+kugenuma|Kugenuma|鵠沼|35.3250|139.4895
+shonankaigankoen|Shonankaigankoen|湘南海岸公園|35.3180|139.4890
+enoshima|Enoshima|江ノ島|35.3090|139.4890
+koshigoe|Koshigoe|腰越|35.3055|139.4970
+kamakurakokomae|Kamakura-Koko-mae|鎌倉高校前|35.3065|139.5060
+shichirigahama|Shichirigahama|七里ヶ浜|35.3065|139.5130
+inamuragasaki|Inamuragasaki|稲村ヶ崎|35.3055|139.5200
+gokurakuji|Gokurakuji|極楽寺|35.3095|139.5280
+hase|Hase|長谷|35.3120|139.5330
+yuigahama|Yuigahama|由比ヶ浜|35.3130|139.5400
+wadazuka|Wadazuka|和田塚|35.3150|139.5455
+kamakura|Kamakura|鎌倉|35.3190|139.5500
+resortgateway|Resort Gateway|リゾートゲートウェイ|35.6385|139.8840
+tokyodisneyland|Tokyo Disneyland|東京ディズニーランド|35.6335|139.8785
+disneybayside|Bayside Station|ベイサイド・ステーション|35.6295|139.8830
+tokyodisneysea|Tokyo DisneySea|東京ディズニーシー|35.6320|139.8885
 `;
 
   const J = (o) => D.LINE_SRC.push(o);
   const PV = { type: 'pvt', grp: 'Private & Others' };
+  const MN = { type: 'mono', grp: 'Monorails & AGT' };
 
   // ---- JR East extras ----
   J({ id: 'JA', code: 'JA', type: 'jr', op: 'JR East', en: 'Saikyo Line', ja: '埼京線', color: '#00AC9A', v: 60, dwell: 28, freq: [3.5, 6, 10], first: 4.8, last: 24.5,
@@ -266,9 +355,9 @@ matsubara|Matsubara|松原|35.6645|139.6425
   J(Object.assign({ id: 'TX', code: 'TX', op: 'Tsukuba Express', en: 'Tsukuba Express', ja: 'つくばエクスプレス', color: '#E5006D', v: 70, dwell: 24, freq: [5, 8, 12], first: 5.0, last: 24.3,
     st: 'akihabara:1 shinokachimachi:2 asakusa:3 minamisenju:4 kitasenju:5 aoi:6 rokucho:7 yashio:8' }, PV));
   J(Object.assign({ id: 'U', code: 'U', op: 'Yurikamome', en: 'Yurikamome', ja: 'ゆりかもめ', color: '#00A5DB', v: 30, dwell: 20, freq: [4, 6, 9], first: 5.0, last: 24.3,
-    st: 'shimbashi:1 shiodome takeshiba hinode shibaurafuto odaibakaihinkoen daiba tokyoteleport aomi telecomcenter kokusaitenjijo ariake ariaketennisnomori shijomae shintoyosu toyosu' }, PV));
+    st: 'shimbashi:1 shiodome takeshiba hinode shibaurafuto odaibakaihinkoen daiba tokyoteleport aomi telecomcenter kokusaitenjijo ariake ariaketennisnomori shijomae shintoyosu toyosu' }, MN));
   J(Object.assign({ id: 'MO', code: 'MO', op: 'Tokyo Monorail', en: 'Tokyo Monorail', ja: '東京モノレール', color: '#009EE0', v: 55, dwell: 22, freq: [4, 6, 10], first: 4.9, last: 24.3,
-    st: 'hamamatsucho:1 tennozuisle oikeibajomae showajima seibijomae tenkubashi hanedat3 hanedat12' }, PV));
+    st: 'hamamatsucho:1 tennozuisle oikeibajomae showajima seibijomae tenkubashi hanedat3 hanedat12' }, MN));
 
   // ---- Trams (type 'tram': single-car marker) ----
   const TM = { type: 'tram', grp: 'Trams' };
@@ -276,4 +365,23 @@ matsubara|Matsubara|松原|35.6645|139.6425
     st: 'minowabashi:1 arakawaitchumae arakawakuyakushomae arakawa2chome arakawa7chome machiya machiya2chome higashiogu3chome kumanomae miyanomae odai arakawayuenchimae arakawashakomae kajiwara sakaecho oji asukayama takinogawa1chome nishigahara4chome shinkoshinzuka koshinzuka sugamoshinden otsuka mukohara higashiikebukuro todenzoshigaya kishibojimmae gakushuinshita omokagebashi todenwaseda' }, TM));
   J(Object.assign({ id: 'SG', code: 'SG', op: 'Tokyu', en: 'Tokyu Setagaya Line', ja: '東急世田谷線', color: '#F5B800', v: 20, dwell: 18, freq: [4, 6, 9], first: 5.0, last: 24.1,
     st: 'sangenjaya:1 nishitaishido wakabayashi shoinjinjamae setagaya kamimachi miyanosaka yamashita matsubara shimotakaido' }, TM));
+
+  // ---- Monorails, AGT & Enoden (colours / numbers approximate) ----
+  J(Object.assign({ id: 'NT', code: 'NT', op: 'Toei', en: 'Nippori-Toneri Liner', ja: '日暮里・舎人ライナー', color: '#D6338E', v: 40, dwell: 20, freq: [3.5, 6, 9], first: 5.0, last: 24.5,
+    st: 'nippori:1 nishinippori akadoshogakkomae kumanomae adachiodai ogiohashi koya kohoku nishiaraidaishinishi yazaike tonerikoen toneri minumadaishinsuikoen' }, MN));
+  J(Object.assign({ id: 'TT', code: 'TT', op: 'Tama Toshi Monorail', en: 'Tama Monorail', ja: '多摩都市モノレール', color: '#E8A317', v: 32, dwell: 22, freq: [5, 8, 12], first: 5.0, last: 24.3,
+    st: 'tamacenter:1 matsugaya otsukateikyo chuomeisei tamadobutsukoen hodokubo takahatafudo manganji koshukaido shibasakitaiikukan tachikawaminami tachikawakita takamatsu tachihi izumitaiikukan sunagawananaban tamagawajosui sakurakaido kamikitadai' }, MN));
+  J(Object.assign({ id: 'SM', code: 'SM', op: 'Shonan Monorail', en: 'Shonan Monorail', ja: '湘南モノレール', color: '#EC6A8B', v: 28, dwell: 20, freq: [8, 12, 15], first: 5.3, last: 23.5,
+    st: 'ofuna:1 fujimicho shonanmachiya shonanfukasawa nishikamakura kataseyama mejiroyamashita shonanenoshima' }, MN));
+  J(Object.assign({ id: 'CM1', code: 'CM', op: 'Chiba Urban Monorail', en: 'Chiba Monorail Line 1', ja: '千葉都市モノレール1号線', color: '#E60012', v: 32, dwell: 22, freq: [6, 9, 13], first: 5.5, last: 23.5,
+    st: 'chibaminato:1 chibashiyakushomae chiba chibasakaecho:16 yoshikawakoen kenchomae' }, MN));
+  J(Object.assign({ id: 'CM2', code: 'CM', op: 'Chiba Urban Monorail', en: 'Chiba Monorail Line 2', ja: '千葉都市モノレール2号線', color: '#009944', v: 32, dwell: 22, freq: [6, 9, 13], first: 5.5, last: 23.5,
+    st: 'chibaminato:1 chibashiyakushomae chiba chibakoen sakusabe tendai anagawa sportscenter chibadobutsukoen mitsuwadai tsuga sakuragi oguradai chishirodaikita chishirodai' }, MN));
+  J(Object.assign({ id: 'KS', code: 'KS', op: 'Yokohama Seaside Line', en: 'Yokohama Seaside Line', ja: '横浜シーサイドライン', color: '#00A1D6', v: 32, dwell: 20, freq: [5, 8, 12], first: 5.0, last: 24.0,
+    st: 'shinsugita:1 nambushijo torihama namikikita namikichuo koura sangyoshinko fukuura shidaiigakubu hakkeijima uminokoenshibaguchi uminokoenminamiguchi nojimakoen kanazawahakkei' }, MN));
+  J({ id: 'RL', code: 'RL', type: 'mono', grp: 'Monorails & AGT', op: 'Disney Resort Line', en: 'Disney Resort Line', ja: 'ディズニーリゾートライン', color: '#F25C9E', v: 24, dwell: 25, freq: [4, 5, 6], first: 8.0, last: 22.5,
+    loop: true, oneway: true, ccw0: true, dirs: ['Resort loop リゾートライン', 'Resort loop リゾートライン'], pill: ['環', '環'],
+    st: 'resortgateway:1 tokyodisneyland disneybayside tokyodisneysea' });
+  J(Object.assign({ id: 'EN', code: 'EN', op: 'Enoden', en: 'Enoshima Electric Railway (Enoden)', ja: '江ノ島電鉄(江ノ電)', color: '#2E8B57', v: 26, dwell: 22, freq: [8, 10, 12], first: 5.0, last: 23.8,
+    st: 'fujisawa:1 ishigami yanagikoji kugenuma shonankaigankoen enoshima koshigoe kamakurakokomae shichirigahama inamuragasaki gokurakuji hase yuigahama wadazuka kamakura' }, { type: 'tram', grp: 'Trams' }));
 })(window);

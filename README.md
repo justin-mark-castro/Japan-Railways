@@ -4,7 +4,7 @@ A schedule-driven simulation of Tokyo's **JR**, **subway** and **private railway
 Open `index.html` (or host on GitHub Pages) — no build step, no dependencies.
 
 ## Features
-- **39 lines**: JR East (Yamanote JY, Chūō Rapid JC, Chūō-Sōbu JB, Keihin-Tōhoku JK, Saikyō JA, Jōban Rapid JJ, Tōkaidō JT, Yokosuka JOY, Sōbu Rapid JOS, Keiyō JE), all 9 Tokyo Metro lines, 4 Toei lines, and private lines (Keiō, Inokashira, Odakyū, Tōkyū ×3, Keikyū, Tōbu ×2, Seibu ×2, Tsukuba Express, Yurikamome, Tokyo Monorail) and both Tokyo **trams** — the Tokyo Sakura Tram (Toden Arakawa, SA01–SA30, via Ōtsuka) and the Tōkyū Setagaya Line (SG01–SG10), drawn as single-car trams
+- **47 lines**: JR East (Yamanote JY, Chūō Rapid JC, Chūō-Sōbu JB, Keihin-Tōhoku JK, Saikyō JA, Jōban Rapid JJ, Tōkaidō JT, Yokosuka JOY, Sōbu Rapid JOS, Keiyō JE), all 9 Tokyo Metro lines, 4 Toei lines, and private lines (Keiō, Inokashira, Odakyū, Tōkyū ×3, Keikyū, Tōbu ×2, Seibu ×2, Tsukuba Express, Yurikamome, Tokyo Monorail) and both Tokyo **trams** — the Tokyo Sakura Tram (Toden Arakawa, SA01–SA30, via Ōtsuka) and the Tōkyū Setagaya Line (SG01–SG10), drawn as single-car trams. Also the **monorails and automated guideway lines**: Tokyo Monorail, Yurikamome, Nippori-Toneri Liner, Tama Monorail, Shonan Monorail, Chiba Monorail (lines 1 & 2), Yokohama Seaside Line and the Disney Resort Line (one-way loop), plus the tram-like Enoden (Fujisawa–Kamakura). Tokyo has no other trams
 - **Train markers look like trains** (white two-car body, line-coloured stripe, headlight) and carry the line badge above them, in the line's symbol shape
 - **Inner / outer loop**: Yamanote (内回り ↺ / 外回り ↻) and Ōedo (右回り / 左回り) trains wear a direction pill (white = first direction, dark = second)
 - **Trains running per line**: click the "📊 N trains running" chip for a live, sorted bar chart by line and by operator group, with the loop split for Yamanote / Ōedo; click a row to focus that line
@@ -12,6 +12,7 @@ Open `index.html` (or host on GitHub Pages) — no build step, no dependencies.
 - Official line colours, codes and station numbers (e.g. **JY17** Shinjuku, **G09** Ginza)
 - Search stations, lines, spots or codes by English, 日本語 or code (`Shinjuku`, `新宿`, `JY17`, `Skytree`)
 - Filters: operator chips, per-line toggles, quick filters (All / None / JR / Subway / Private), interchanges-only
+- Sidebar sections collapse, and the divider above Display can be dragged (double-click to reset); the layout is remembered
 - Click a station for interchanges + departure board; a line for stats; a train for route and ETAs
 - Time controls: scrub the day, 1×–120×, rush-hour / daytime / last-train presets, "Now" (JST)
 - EN / 日本語, dark / light, mobile friendly
@@ -30,6 +31,7 @@ node tools/odpt/convert.mjs          # writes data/timetable.json, data/geometry
 
 Reload the site: a **Timetable** section appears in the sidebar (Simulated / Weekday / Holiday). Lines without real data keep the simulation.
 
+- The ODPT ids for Nippori-Toneri Liner and Tama Monorail in `line-map.json` are guesses, and ODPT may not cover Chiba, Shonan, Seaside, Resort Line or Enoden at all (those keep the simulation).
 - `tools/odpt/line-map.json` maps ODPT railway ids to this site's line ids — check them against your dataset. JR East data may be on a different endpoint (`ODPT_BASE_CHALLENGE`) or only available as GTFS (no GTFS converter yet).
 - Unmatched station names are listed by `convert.mjs`; map them in `tools/odpt/station-overrides.json` (`{"odpt.Station:…": "siteStationId"}`).
 - Stops outside the site's line definitions are dropped, so through-running trips are truncated at the line boundary; Ōedo's loop-plus-stem shape is not modelled exactly.

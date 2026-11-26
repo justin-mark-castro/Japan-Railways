@@ -39,9 +39,20 @@ kbd{font-size:11px;border:1px solid var(--line);border-radius:6px;padding:1px 6p
 .only-mobile{display:none}
 
 /* sidebar */
-#sidebar{grid-area:side;background:var(--bg2);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;z-index:20}
-.side-head{padding:14px 14px 8px}
-.side-head h2,.side-foot h3{margin:0 0 10px;font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);font-weight:700}
+#sidebar{grid-area:side;background:var(--bg2);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;z-index:20;overflow-y:auto}
+.side-head{padding:6px 14px 8px;flex:none}
+.sec>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;padding:9px 0;font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);font-weight:700;user-select:none}
+.sec>summary::-webkit-details-marker{display:none}
+.sec>summary::before{content:"";width:6px;height:6px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(-45deg);transition:transform .15s;margin:0 2px 0 2px}
+.sec[open]>summary::before{transform:rotate(45deg)}
+.sec>summary:hover{color:var(--text)}
+.sec-hint{font-weight:500;text-transform:none;letter-spacing:0;opacity:.7}
+.sec:not([open])>*:not(summary){display:none}
+.tgrid{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
+.tgrid .tog span{font-size:12.5px}
+#splitter{flex:none;height:12px;cursor:row-resize;border-top:1px solid var(--line);position:relative;touch-action:none;background:var(--bg2)}
+#splitter::after{content:"";position:absolute;left:50%;top:3px;width:38px;height:4px;border-radius:4px;background:var(--line);transform:translateX(-50%);transition:background .15s}
+#splitter:hover::after,#splitter.drag::after,#splitter:focus-visible::after{background:var(--accent)}
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
 .chip{border:1px solid var(--line);background:var(--panel2);border-radius:999px;padding:4px 10px;font-size:12px;cursor:pointer;display:flex;gap:6px;align-items:center}
 .chip i{width:8px;height:8px;border-radius:50%;background:var(--muted)}
@@ -52,7 +63,7 @@ kbd{font-size:11px;border:1px solid var(--line);border-radius:6px;padding:1px 6p
 .quick{display:flex;gap:6px;margin-top:8px}
 .quick button{flex:1;height:28px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);cursor:pointer;font-size:12px;color:var(--muted)}
 .quick button:hover{color:var(--text);border-color:var(--accent)}
-.line-list{flex:1;overflow:auto;padding:0 8px 8px;scrollbar-width:thin}
+.line-list{flex:1 1 0;min-height:140px;overflow:auto;padding:0 8px 8px;scrollbar-width:thin}
 .grp{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;padding:12px 8px 6px;font-weight:700}
 .lrow{display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:10px;cursor:pointer;border:1px solid transparent}
 .lrow:hover{background:var(--panel2)}
@@ -66,7 +77,8 @@ kbd{font-size:11px;border:1px solid var(--line);border-radius:6px;padding:1px 6p
 .eye:hover{border-color:var(--accent);color:var(--text)}
 .lrow.off .eye{background:transparent}
 .lrow:not(.off) .eye{background:var(--c);border-color:var(--c);color:var(--tc)}
-.side-foot{border-top:1px solid var(--line);padding:12px 14px 14px}
+.side-foot{flex:none;height:var(--footH,auto);max-height:60%;overflow:auto;padding:0 14px 8px;scrollbar-width:thin}
+.side-foot .sec+.sec{border-top:1px solid var(--line)}
 .tog{display:flex;align-items:center;gap:10px;padding:5px 0;font-size:13px;cursor:pointer;user-select:none}
 .tog input{appearance:none;width:34px;height:20px;border-radius:999px;background:var(--line);position:relative;cursor:pointer;transition:.15s;flex:none}
 .tog input::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:.15s}
@@ -209,3 +221,5 @@ kbd{font-size:11px;border:1px solid var(--line);border-radius:6px;padding:1px 6p
 
 .sym.tram{border-radius:5px;min-width:30px;padding:0 6px}
 .sym.tram.sm{min-width:24px}
+.sym.mono{clip-path:polygon(12% 0,88% 0,100% 50%,88% 100%,12% 100%,0 50%);min-width:32px;padding:0 8px;border-radius:0}
+.sym.mono.sm{min-width:26px}

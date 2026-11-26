@@ -16,7 +16,7 @@
   /* ---------------- state ---------------- */
   const S = {
     lang: 'en', theme: 'dark', t: 8 * 3600, speed: 10, playing: true,
-    hidden: new Set(), ops: { 'JR East': true, 'Tokyo Metro': true, 'Toei Subway': true, 'Private & Others': true },
+    hidden: new Set(), ops: { 'JR East': true, 'Tokyo Metro': true, 'Toei Subway': true, 'Private & Others': true, 'Trams': true, 'Monorails & AGT': true },
     sel: null,            // {type:'station'|'line'|'train', id}
     follow: null,
     opts: { trains: true, names: true, badges: true, inter: false, water: true, poi: true },
@@ -326,6 +326,7 @@
   function badgePath(L, r) {
     if (L.type === 'jr') roundRect(-r, -r, r * 2, r * 2, r * .36);
     else if (L.type === 'pvt') roundRect(-r * 1.25, -r * .85, r * 2.5, r * 1.7, r * .85);
+    else if (L.type === 'mono') { ctx.beginPath(); for (let k = 0; k < 6; k++) { const an = Math.PI / 3 * k + Math.PI / 6; ctx[k ? 'lineTo' : 'moveTo'](Math.cos(an) * r * 1.08, Math.sin(an) * r * 1.08); } ctx.closePath(); }
     else if (L.type === 'tram') roundRect(-r * 1.2, -r * .9, r * 2.4, r * 1.8, r * .28);
     else { ctx.beginPath(); ctx.arc(0, 0, r, 0, 7); }
   }
@@ -501,7 +502,7 @@
   }
 
   /* ---------------- sidebar ---------------- */
-  const OPS = [['JR East', '#9ACD32'], ['Tokyo Metro', '#FF9500'], ['Toei Subway', '#6CBB5A'], ['Private & Others', '#8F76D6'], ['Trams', '#E5508F']];
+  const OPS = [['JR East', '#9ACD32'], ['Tokyo Metro', '#FF9500'], ['Toei Subway', '#6CBB5A'], ['Private & Others', '#8F76D6'], ['Trams', '#E5508F'], ['Monorails & AGT', '#2BB3A3']];
   function buildSidebar() {
     $('opChips').innerHTML = OPS.map(([op, col]) => `<button class="chip ${S.ops[op] ? 'on' : ''}" data-op="${op}"><i style="background:${col}"></i>${op}</button>`).join('');
     $('opChips').onclick = e => {
@@ -515,7 +516,7 @@
       const q = e.target.dataset.q; if (!q) return;
       S.hidden.clear();
       lines.forEach(L => {
-        if (q === 'none' || (q === 'jr' && L.type !== 'jr') || (q === 'subway' && L.type !== 'metro' && L.type !== 'toei') || (q === 'pvt' && L.type !== 'pvt' && L.type !== 'tram')) S.hidden.add(L.id);
+        if (q === 'none' || (q === 'jr' && L.type !== 'jr') || (q === 'subway' && L.type !== 'metro' && L.type !== 'toei') || (q === 'pvt' && L.type !== 'pvt' && L.type !== 'tram' && L.type !== 'mono')) S.hidden.add(L.id);
       });
       syncSidebar();
     };
@@ -532,7 +533,7 @@
         html += `<div class="lrow ${S.hidden.has(L.id) ? 'off' : ''} ${S.sel && S.sel.type === 'line' && S.sel.id === L.id ? 'active' : ''}" data-id="${L.id}" style="--c:${L.color};--tc:${L.textColor}">
           <button class="eye" data-eye="${L.id}" aria-label="Toggle ${L.en}">${S.hidden.has(L.id) ? '' : '✓'}</button>
           ${bdg(L)}
-          <div class="nm"><b>${lineName(L)}</b><small>${L.type === 'pvt' || L.type === 'tram' ? L.op + ' · ' : ''}${nm2(L)} · ${L.n} stn</small></div>
+          <div class="nm"><b>${lineName(L)}</b><small>${L.type === 'pvt' || L.type === 'tram' || L.type === 'mono' ? L.op + ' · ' : ''}${nm2(L)} · ${L.n} stn</small></div>
           <span class="cnt" data-l="${L.id}" title="trains running">0</span></div>`;
       });
     });
@@ -652,7 +653,7 @@
     const n = S.trains.filter(t => t.line === L).length;
     const hw = TRS.headwayAt(L, S.t);
     const inn = S.trains.filter(t => t.line === L && t.dir === 0).length;
-    const split = L.loop ? `<div class="p-sub" style="margin:8px 0 0">↺ ${L.ccw0 ? L.dirNames[0] : L.dirNames[1]}: <b>${L.ccw0 ? inn : n - inn}</b> &nbsp;·&nbsp; ↻ ${L.ccw0 ? L.dirNames[1] : L.dirNames[0]}: <b>${L.ccw0 ? n - inn : inn}</b></div>` : '';
+    const split = L.loop && !L.oneway ? `<div class="p-sub" style="margin:8px 0 0">↺ ${L.ccw0 ? L.dirNames[0] : L.dirNames[1]}: <b>${L.ccw0 ? inn : n - inn}</b> &nbsp;·&nbsp; ↻ ${L.ccw0 ? L.dirNames[1] : L.dirNames[0]}: <b>${L.ccw0 ? n - inn : inn}</b></div>` : '';
     return `<div class="kv"><div><b>${n}</b><small>trains now</small></div><div><b>${hw}′</b><small>headway</small></div><div><b>${(L.len / 1000).toFixed(1)} km</b><small>${L.n} stations</small></div></div>` + split;
   }
   function trainHTML(t) {
@@ -897,10 +898,10 @@
     const rows = lines.slice().sort((a, b) => (cnt[b.id] || 0) - (cnt[a.id] || 0) || a.order - b.order);
     const max = Math.max(1, ...Object.values(cnt));
     $('countHead').innerHTML = `<b>${S.trains.length}</b> trains running <span class="muted">· ${S.lang === 'ja' ? '路線別' : 'by line'}</span>`;
-    $('countGrp').innerHTML = OPS.map(([op, col]) => `<span class="gchip"><i style="background:${col}"></i>${op.replace(' Subway', '').replace(' & Others', '').replace('Private', 'Private')} <b>${grp[op] || 0}</b></span>`).join('');
+    $('countGrp').innerHTML = OPS.map(([op, col]) => `<span class="gchip"><i style="background:${col}"></i>${op.replace(' Subway', '').replace(' & Others', '').replace(' & AGT', '')} <b>${grp[op] || 0}</b></span>`).join('');
     $('countRows').innerHTML = rows.map(L => {
       const n = cnt[L.id] || 0, off = S.hidden.has(L.id);
-      const split = L.loop && n ? `<small class="split">↺${L.ccw0 ? (inner[L.id] || 0) : n - (inner[L.id] || 0)} ↻${L.ccw0 ? n - (inner[L.id] || 0) : (inner[L.id] || 0)}</small>` : '';
+      const split = L.loop && !L.oneway && n ? `<small class="split">↺${L.ccw0 ? (inner[L.id] || 0) : n - (inner[L.id] || 0)} ↻${L.ccw0 ? n - (inner[L.id] || 0) : (inner[L.id] || 0)}</small>` : '';
       return `<div class="crow ${off ? 'off' : ''}" data-line="${L.id}" style="--c:${L.color}">${bdg(L, null, true)}
         <span class="cn">${nm(L)}${split}</span><span class="bar"><i style="width:${(n / max * 100).toFixed(1)}%"></i></span><b class="cc">${n}</b></div>`;
     }).join('');

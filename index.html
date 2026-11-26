@@ -29,8 +29,8 @@
   </header>
 
   <aside id="sidebar">
-    <div class="side-head">
-      <h2>Lines</h2>
+    <details class="sec side-head" id="secFilters" open>
+      <summary>Lines <span class="sec-hint">filters</span></summary>
       <div class="chips" id="opChips"></div>
       <input id="lineFilter" type="search" placeholder="Filter lines (e.g. Yamanote, JC, Toei)…">
       <div class="quick">
@@ -40,22 +40,30 @@
         <button data-q="subway">Subway</button>
         <button data-q="pvt">Private</button>
       </div>
-    </div>
+    </details>
     <div id="lineList" class="line-list"></div>
-    <div class="side-foot">
-      <div id="ttSection" hidden>
-        <h3>Timetable</h3>
+    <div id="splitter" role="separator" aria-orientation="horizontal" tabindex="0" title="Drag to resize · double-click to reset"></div>
+    <div class="side-foot" id="sideFoot">
+      <details class="sec" id="ttSection" hidden>
+        <summary>Timetable</summary>
         <div class="quick" id="ttBtns" style="margin:0 0 6px"><button data-m="sim">Simulated</button><button data-m="weekday">Weekday</button><button data-m="holiday">Holiday</button></div>
-        <p id="ttNote" class="empty-note" style="margin:0 0 12px"></p>
-      </div>
-      <h3>Display</h3>
-      <label class="tog"><input type="checkbox" id="optTrains" checked><span>Trains</span></label>
-      <label class="tog"><input type="checkbox" id="optNames" checked><span>Station names</span></label>
-      <label class="tog"><input type="checkbox" id="optBadges" checked><span>Line codes at stations</span></label>
-      <label class="tog"><input type="checkbox" id="optInter"><span>Interchanges only</span></label>
-      <label class="tog"><input type="checkbox" id="optWater" checked><span>Bay &amp; rivers</span></label>
-      <label class="tog"><input type="checkbox" id="optPoi" checked><span>Tourist spots</span></label>
-      <div id="poiChips" class="chips" style="margin:6px 0 0"></div>
+        <p id="ttNote" class="empty-note" style="margin:0 0 8px"></p>
+      </details>
+      <details class="sec" id="secDisplay" open>
+        <summary>Display</summary>
+        <div class="tgrid">
+          <label class="tog"><input type="checkbox" id="optTrains" checked><span>Trains</span></label>
+          <label class="tog"><input type="checkbox" id="optNames" checked><span>Station names</span></label>
+          <label class="tog"><input type="checkbox" id="optBadges" checked><span>Line codes</span></label>
+          <label class="tog"><input type="checkbox" id="optInter"><span>Interchanges only</span></label>
+          <label class="tog"><input type="checkbox" id="optWater" checked><span>Bay &amp; rivers</span></label>
+        </div>
+      </details>
+      <details class="sec" id="secSpots">
+        <summary>Tourist spots</summary>
+        <label class="tog"><input type="checkbox" id="optPoi" checked><span>Show on map</span></label>
+        <div id="poiChips" class="chips" style="margin:6px 0 0"></div>
+      </details>
     </div>
   </aside>
 
@@ -92,5 +100,6 @@
 <script src="js/poi.js"></script>
 <script src="js/sim.js"></script>
 <script src="js/app.js"></script>
+<script src="js/layout.js"></script>
 </body>
 </html>

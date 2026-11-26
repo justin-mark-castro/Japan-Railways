@@ -25,6 +25,8 @@
   "odpt.Railway:Toei.Oedo": "E",
   "odpt.Railway:Toei.Arakawa": "SA",
   "odpt.Railway:Tokyu.Setagaya": "SG",
+  "odpt.Railway:Toei.NipporiToneriLiner": "NT",
+  "odpt.Railway:TamaMonorail.TamaMonorail": "TT",
   "odpt.Railway:Keio.Keio": "KO",
   "odpt.Railway:Keio.Inokashira": "IN",
   "odpt.Railway:Odakyu.Odawara": "OH",

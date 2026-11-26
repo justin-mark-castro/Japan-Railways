@@ -101,6 +101,7 @@
         });
         const starts = [];
         let t = L.first * 3600 + dir * 100;
+        if (L.oneway && dir === 1) t = Infinity;
         while (t < L.last * 3600) { starts.push(t); t += headwayAt(L, t) * 60; }
         return { dir, stops, arr, dep, cumAt, T: arr[arr.length - 1], starts };
       });
