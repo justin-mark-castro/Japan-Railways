@@ -206,3 +206,6 @@ kbd{font-size:11px;border:1px solid var(--line);border-radius:6px;padding:1px 6p
 .crow .bar i{display:block;height:100%;background:var(--c);border-radius:99px;transition:width .3s}
 .crow .cc{text-align:right;font-variant-numeric:tabular-nums;font-size:14px}
 @media (max-width:860px){.card{left:8px;right:8px;width:auto;top:50px;max-height:50%}}
+
+.sym.tram{border-radius:5px;min-width:30px;padding:0 6px}
+.sym.tram.sm{min-width:24px}

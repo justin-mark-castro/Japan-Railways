@@ -187,6 +187,40 @@ tennozuisle|Tennozu Isle|天王洲アイル|35.6218|139.7458
 oikeibajomae|Oi-Keibajo-mae|大井競馬場前|35.5925|139.7472
 showajima|Showajima|昭和島|35.5810|139.7490
 seibijomae|Seibijo-mae|整備場|35.5560|139.7570
+minowabashi|Minowabashi|三ノ輪橋|35.7290|139.7925
+arakawaitchumae|Arakawa-itchumae|荒川一中前|35.7335|139.7900
+arakawakuyakushomae|Arakawa-kuyakushomae|荒川区役所前|35.7372|139.7875
+arakawa2chome|Arakawa-nichome|荒川二丁目|35.7405|139.7858
+arakawa7chome|Arakawa-nanachome|荒川七丁目|35.7437|139.7845
+machiya2chome|Machiya-nichome|町屋二丁目|35.7490|139.7810
+higashiogu3chome|Higashi-ogu-sanchome|東尾久三丁目|35.7510|139.7760
+kumanomae|Kumanomae|熊野前|35.7525|139.7725
+miyanomae|Miyanomae|宮ノ前|35.7545|139.7690
+odai|Odai|小台|35.7560|139.7650
+arakawayuenchimae|Arakawa-yuenchimae|荒川遊園地前|35.7570|139.7600
+arakawashakomae|Arakawa-shakomae|荒川車庫前|35.7568|139.7555
+kajiwara|Kajiwara|梶原|35.7560|139.7500
+sakaecho|Sakaecho|栄町|35.7550|139.7440
+asukayama|Asukayama|飛鳥山|35.7520|139.7365
+takinogawa1chome|Takinogawa-itchome|滝野川一丁目|35.7490|139.7390
+nishigahara4chome|Nishigahara-yonchome|西ヶ原四丁目|35.7440|139.7385
+shinkoshinzuka|Shin-koshinzuka|新庚申塚|35.7400|139.7355
+koshinzuka|Koshinzuka|庚申塚|35.7370|139.7330
+sugamoshinden|Sugamoshinden|巣鴨新田|35.7340|139.7305
+mukohara|Mukohara|向原|35.7305|139.7240
+todenzoshigaya|Toden-zoshigaya|都電雑司ヶ谷|35.7240|139.7170
+kishibojimmae|Kishibojimmae|鬼子母神前|35.7180|139.7152
+gakushuinshita|Gakushuinshita|学習院下|35.7135|139.7168
+omokagebashi|Omokagebashi|面影橋|35.7100|139.7190
+todenwaseda|Waseda (Toden)|早稲田(都電)|35.7067|139.7222
+nishitaishido|Nishi-Taishido|西太子堂|35.6451|139.6674
+wakabayashi|Wakabayashi|若林|35.6480|139.6625
+shoinjinjamae|Shoin-jinja-mae|松陰神社前|35.6492|139.6572
+setagaya|Setagaya|世田谷|35.6525|139.6531
+kamimachi|Kamimachi|上町|35.6555|139.6500
+miyanosaka|Miyanosaka|宮の坂|35.6585|139.6470
+yamashita|Yamashita|山下|35.6612|139.6445
+matsubara|Matsubara|松原|35.6645|139.6425
 `;
 
   const J = (o) => D.LINE_SRC.push(o);
@@ -235,4 +269,11 @@ seibijomae|Seibijo-mae|整備場|35.5560|139.7570
     st: 'shimbashi:1 shiodome takeshiba hinode shibaurafuto odaibakaihinkoen daiba tokyoteleport aomi telecomcenter kokusaitenjijo ariake ariaketennisnomori shijomae shintoyosu toyosu' }, PV));
   J(Object.assign({ id: 'MO', code: 'MO', op: 'Tokyo Monorail', en: 'Tokyo Monorail', ja: '東京モノレール', color: '#009EE0', v: 55, dwell: 22, freq: [4, 6, 10], first: 4.9, last: 24.3,
     st: 'hamamatsucho:1 tennozuisle oikeibajomae showajima seibijomae tenkubashi hanedat3 hanedat12' }, PV));
+
+  // ---- Trams (type 'tram': single-car marker) ----
+  const TM = { type: 'tram', grp: 'Trams' };
+  J(Object.assign({ id: 'SA', code: 'SA', op: 'Toei', en: 'Tokyo Sakura Tram (Toden Arakawa)', ja: '東京さくらトラム(都電荒川線)', color: '#E5508F', v: 22, dwell: 20, freq: [4, 6, 8], first: 5.8, last: 22.4,
+    st: 'minowabashi:1 arakawaitchumae arakawakuyakushomae arakawa2chome arakawa7chome machiya machiya2chome higashiogu3chome kumanomae miyanomae odai arakawayuenchimae arakawashakomae kajiwara sakaecho oji asukayama takinogawa1chome nishigahara4chome shinkoshinzuka koshinzuka sugamoshinden otsuka mukohara higashiikebukuro todenzoshigaya kishibojimmae gakushuinshita omokagebashi todenwaseda' }, TM));
+  J(Object.assign({ id: 'SG', code: 'SG', op: 'Tokyu', en: 'Tokyu Setagaya Line', ja: '東急世田谷線', color: '#F5B800', v: 20, dwell: 18, freq: [4, 6, 9], first: 5.0, last: 24.1,
+    st: 'sangenjaya:1 nishitaishido wakabayashi shoinjinjamae setagaya kamimachi miyanosaka yamashita matsubara shimotakaido' }, TM));
 })(window);

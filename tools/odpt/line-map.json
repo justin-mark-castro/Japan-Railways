@@ -23,6 +23,8 @@
   "odpt.Railway:Toei.Mita": "I",
   "odpt.Railway:Toei.Shinjuku": "S",
   "odpt.Railway:Toei.Oedo": "E",
+  "odpt.Railway:Toei.Arakawa": "SA",
+  "odpt.Railway:Tokyu.Setagaya": "SG",
   "odpt.Railway:Keio.Keio": "KO",
   "odpt.Railway:Keio.Inokashira": "IN",
   "odpt.Railway:Odakyu.Odawara": "OH",

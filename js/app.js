@@ -326,6 +326,7 @@
   function badgePath(L, r) {
     if (L.type === 'jr') roundRect(-r, -r, r * 2, r * 2, r * .36);
     else if (L.type === 'pvt') roundRect(-r * 1.25, -r * .85, r * 2.5, r * 1.7, r * .85);
+    else if (L.type === 'tram') roundRect(-r * 1.2, -r * .9, r * 2.4, r * 1.8, r * .28);
     else { ctx.beginPath(); ctx.arc(0, 0, r, 0, 7); }
   }
   function drawTrains() {
@@ -361,7 +362,7 @@
         ctx.quadraticCurveTo(x0, hw, x0, hw - rr); ctx.lineTo(x0, -hw + rr); ctx.quadraticCurveTo(x0, -hw, x0 + rr, -hw);
         ctx.closePath();
       };
-      [[rear, -gap / 2, R * .3, R * .45], [mid, cl + gap / 2, R * 1.05, R * .3]].forEach(([x0, x1, rf, rr], i) => {
+      (L.type === 'tram' ? [[-cl * .72, cl * .72, R * .9, R * .8]] : [[rear, -gap / 2, R * .3, R * .45], [mid, cl + gap / 2, R * 1.05, R * .3]]).forEach(([x0, x1, rf, rr], i) => {
         car(x0, x1, rf, rr); ctx.fillStyle = body; ctx.fill(); ctx.strokeStyle = edge; ctx.stroke();
         // coloured side stripe
         ctx.save(); car(x0, x1, rf, rr); ctx.clip();
@@ -369,13 +370,14 @@
         ctx.restore();
         if (R >= 5.5) { // windows
           ctx.fillStyle = 'rgba(20,38,58,.82)';
-          const n = 3, w = (x1 - x0 - R * .5 - (i ? R * .5 : 0)) / n;
+          const n = L.type === 'tram' ? 4 : 3, w = (x1 - x0 - R * .5 - (i || L.type === 'tram' ? R * .5 : 0)) / n;
           for (let k = 0; k < n; k++) ctx.fillRect(x0 + R * .3 + k * w + w * .12, -hw * .62, w * .76, hw * .5);
         }
       });
       // nose: windscreen + headlight
-      if (R >= 5.5) { ctx.fillStyle = 'rgba(20,38,58,.9)'; ctx.fillRect(cl + gap / 2 - R * .42, -hw * .55, R * .22, hw * 1.1 * .55); }
-      ctx.beginPath(); ctx.arc(cl + gap / 2 - R * .06, 0, Math.max(1, R * .17), 0, 7); ctx.fillStyle = '#ffd24a'; ctx.fill();
+      const nose = L.type === 'tram' ? cl * .72 : cl + gap / 2;
+      if (R >= 5.5) { ctx.fillStyle = 'rgba(20,38,58,.9)'; ctx.fillRect(nose - R * .42, -hw * .55, R * .22, hw * 1.1 * .55); }
+      ctx.beginPath(); ctx.arc(nose - R * .06, 0, Math.max(1, R * .17), 0, 7); ctx.fillStyle = '#ffd24a'; ctx.fill();
       ctx.restore();
       // ---- line badge on top of the train (upright) ----
       const br = Math.max(3.4, R * .72);
@@ -499,7 +501,7 @@
   }
 
   /* ---------------- sidebar ---------------- */
-  const OPS = [['JR East', '#9ACD32'], ['Tokyo Metro', '#FF9500'], ['Toei Subway', '#6CBB5A'], ['Private & Others', '#8F76D6']];
+  const OPS = [['JR East', '#9ACD32'], ['Tokyo Metro', '#FF9500'], ['Toei Subway', '#6CBB5A'], ['Private & Others', '#8F76D6'], ['Trams', '#E5508F']];
   function buildSidebar() {
     $('opChips').innerHTML = OPS.map(([op, col]) => `<button class="chip ${S.ops[op] ? 'on' : ''}" data-op="${op}"><i style="background:${col}"></i>${op}</button>`).join('');
     $('opChips').onclick = e => {
@@ -513,7 +515,7 @@
       const q = e.target.dataset.q; if (!q) return;
       S.hidden.clear();
       lines.forEach(L => {
-        if (q === 'none' || (q === 'jr' && L.type !== 'jr') || (q === 'subway' && L.type !== 'metro' && L.type !== 'toei') || (q === 'pvt' && L.type !== 'pvt')) S.hidden.add(L.id);
+        if (q === 'none' || (q === 'jr' && L.type !== 'jr') || (q === 'subway' && L.type !== 'metro' && L.type !== 'toei') || (q === 'pvt' && L.type !== 'pvt' && L.type !== 'tram')) S.hidden.add(L.id);
       });
       syncSidebar();
     };
@@ -530,7 +532,7 @@
         html += `<div class="lrow ${S.hidden.has(L.id) ? 'off' : ''} ${S.sel && S.sel.type === 'line' && S.sel.id === L.id ? 'active' : ''}" data-id="${L.id}" style="--c:${L.color};--tc:${L.textColor}">
           <button class="eye" data-eye="${L.id}" aria-label="Toggle ${L.en}">${S.hidden.has(L.id) ? '' : '✓'}</button>
           ${bdg(L)}
-          <div class="nm"><b>${lineName(L)}</b><small>${L.type === 'pvt' ? L.op + ' · ' : ''}${nm2(L)} · ${L.n} stn</small></div>
+          <div class="nm"><b>${lineName(L)}</b><small>${L.type === 'pvt' || L.type === 'tram' ? L.op + ' · ' : ''}${nm2(L)} · ${L.n} stn</small></div>
           <span class="cnt" data-l="${L.id}" title="trains running">0</span></div>`;
       });
     });
@@ -895,7 +897,7 @@
     const rows = lines.slice().sort((a, b) => (cnt[b.id] || 0) - (cnt[a.id] || 0) || a.order - b.order);
     const max = Math.max(1, ...Object.values(cnt));
     $('countHead').innerHTML = `<b>${S.trains.length}</b> trains running <span class="muted">· ${S.lang === 'ja' ? '路線別' : 'by line'}</span>`;
-    $('countGrp').innerHTML = OPS.map(([op, col]) => `<span class="gchip"><i style="background:${col}"></i>${op.replace(' Subway', '').replace(' & Others', '')} <b>${grp[op] || 0}</b></span>`).join('');
+    $('countGrp').innerHTML = OPS.map(([op, col]) => `<span class="gchip"><i style="background:${col}"></i>${op.replace(' Subway', '').replace(' & Others', '').replace('Private', 'Private')} <b>${grp[op] || 0}</b></span>`).join('');
     $('countRows').innerHTML = rows.map(L => {
       const n = cnt[L.id] || 0, off = S.hidden.has(L.id);
       const split = L.loop && n ? `<small class="split">↺${L.ccw0 ? (inner[L.id] || 0) : n - (inner[L.id] || 0)} ↻${L.ccw0 ? n - (inner[L.id] || 0) : (inner[L.id] || 0)}</small>` : '';
