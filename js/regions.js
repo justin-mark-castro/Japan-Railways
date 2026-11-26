@@ -54,12 +54,19 @@
   const regionOfPref = {};
   REGIONS.forEach(r => r.prefs.forEach(p => { regionOfPref[p] = r; }));
 
+  // extra anchor points for prefectures too large/elongated for their capital alone (otherwise e.g. Hakodate counts as Aomori)
+  const EXTRA = [
+    ['hokkaido', 41.77, 140.73], ['hokkaido', 42.32, 140.97], ['hokkaido', 43.77, 142.36], ['hokkaido', 42.92, 143.20], ['hokkaido', 42.98, 144.38],
+    ['hokkaido', 43.80, 143.89], ['hokkaido', 45.41, 141.67], ['hokkaido', 44.02, 144.27], ['hokkaido', 42.64, 141.60],
+    ['niigata', 37.45, 138.85], ['okinawa', 24.80, 125.28], ['okinawa', 24.34, 124.16], ['kagoshima', 31.38, 130.85], ['nagasaki', 34.20, 129.29]
+  ];
+  const PTS = PREFS.map(p => ({ p, lat: p.lat, lon: p.lon })).concat(EXTRA.map(([id, lat, lon]) => ({ p: prefById[id], lat, lon })));
   function nearestPref(lat, lon) {
     const k = Math.cos(lat * Math.PI / 180);
     let best = null, bd = 1e9;
-    for (const p of PREFS) {
-      const dx = (p.lon - lon) * k, dy = p.lat - lat, d = dx * dx + dy * dy;
-      if (d < bd) { bd = d; best = p; }
+    for (const q of PTS) {
+      const dx = (q.lon - lon) * k, dy = q.lat - lat, d = dx * dx + dy * dy;
+      if (d < bd) { bd = d; best = q.p; }
     }
     return best;
   }

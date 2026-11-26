@@ -3,3 +3,4 @@
 .env.*
 tools/odpt/raw/
 node_modules/
+__pycache__/

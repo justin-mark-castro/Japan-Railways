@@ -13,7 +13,9 @@ Outputs:
 Everything produced here is SIMULATION INPUT: timetables are not part of the source data, so speeds and
 headways are generated from line type, station spacing and distance to the nearest big city.
 """
-import argparse, collections, json, math, os, re, sys
+import argparse, collections, csv, json, math, os, re, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from names_en import OP_EN, PREFIXES, PAREN_WORDS
 
 ap = argparse.ArgumentParser()
 ap.add_argument('--sdb', required=True); ap.add_argument('--mlit', required=True); ap.add_argument('--curated', required=True)
@@ -41,6 +43,7 @@ def romaji(kana):
         c = s[i]
         if c == 'っ': geminate = True; i += 1; continue
         if c == 'ー': out.append(out[-1][-1] if out else ''); i += 1; continue
+        if c in '・･': out.append('-'); i += 1; continue
         if c == 'ん':
             nxt = s[i + 1] if i + 1 < len(s) else ''
             out.append("n'" if nxt and nxt in 'あいうえおやゆよ' else 'n'); i += 1; continue
@@ -59,23 +62,58 @@ def romaji(kana):
     r = re.sub(r'oo|ou', 'o', r); r = re.sub(r'uu', 'u', r)
     return r.replace("n'", "n'")
 def cap(s): return re.sub(r"(^|[- ])([a-z])", lambda m: m.group(1) + m.group(2).upper(), s)
+DIR_PREFIX = {'東': 'ひがし', '西': 'にし', '南': 'みなみ', '北': 'きた', '新': 'しん'}
 def en_station(name, kana):
-    r = romaji(kana)
+    k = kata2hira(kana or ''); r = romaji(k)
     if not r: return name
     n = name.replace('ケ', 'ヶ')
-    if n.startswith('新') and len(n) >= 3 and r.startswith('shin') and not n[1] in '宿橋' and not n.startswith('新宿'): r = 'shin-' + r[4:]
-    r = re.sub(r'(mae)$', r'-\1', r) if n.endswith('前') and len(r) > 5 else r
-    r = re.sub(r'(koen)$', r'-\1', r) if n.endswith('公園') and len(r) > 6 else r
-    r = re.sub(r'(dori)$', r'-\1', r) if n.endswith('通') and len(r) > 6 else r
+    # Higashi-/Nishi-/Minami-/Kita-/Shin- compounds (Higashi-Ikebukuro, Shin-Osaka) but not two-character names (Higashiyama, Shinjuku)
+    if len(n) >= 3 and n[0] in DIR_PREFIX and k.startswith(DIR_PREFIX[n[0]]) and not n.startswith('新宿'):
+        head = DIR_PREFIX[n[0]]; r = romaji(head) + '-' + romaji(k[len(head):])
+    for suf_ja, suf_k in (('前', 'まえ'), ('公園', 'こうえん'), ('通', 'どおり'), ('通', 'とおり'), ('通', 'どうり'), ('丁目', 'ちょうめ'), ('中央', 'ちゅうおう')):
+        if n.endswith(suf_ja) and k.endswith(suf_k) and len(n) > len(suf_ja) + 1:
+            tail = romaji(suf_k)
+            if r.endswith(tail):
+                head = r[:-len(tail)].rstrip('-')
+                r = head + '-' + tail
+            break
     return cap(r)
-LINE_SUFFIX = [('しんかんせん', ' Shinkansen'), ('ほんせん', ' Main Line'), ('せん', ' Line')]
-def en_line(name, kana):
-    k = kata2hira(kana or ''); suf = ''; pre = ''
-    if name.startswith('JR') and k.startswith('じぇいあーる'): k = k[len('じぇいあーる'):]; pre = 'JR '
-    for a, b in LINE_SUFFIX:
-        if k.endswith(a): k = k[:-len(a)]; suf = b; break
-    r = cap(romaji(k)) if k else ''
-    return (pre + r + suf).strip() or name
+def en_name_kana(kana): return cap(romaji(kana))
+
+FW = str.maketrans('０１２３４５６７８９ＡＢＣＤＥＬ', '0123456789ABCDEL')
+def split_paren(t):
+    m = re.match(r'^(.*?)[(（](.*)[)）]\s*$', t or '')
+    return (m.group(1), m.group(2)) if m else (t or '', '')
+def sim(a, b): return sum(x == y for x, y in zip(a, b)) / max(len(a), len(b), 1)
+def en_line(name, kana, st_lookup=None):
+    """English line name: operator brand (names_en.py) + romanised remainder + suffix + optional (A-B) section."""
+    base, par = split_paren(name); kbase, kpar = split_paren(kata2hira(kana or ''))
+    brand, rest_j, rest_k = '', base, kbase
+    for pj, pk, en in PREFIXES:
+        if base.startswith(pj) and (kbase.startswith(pk) or (len(kbase) >= len(pk) and sim(kbase[:len(pk)], pk) >= 0.7)):
+            brand, rest_j, rest_k = en, base[len(pj):], kbase[len(pk):]
+            if rest_j == pj + '線' and rest_k.startswith(pk): rest_j, rest_k = '線', 'せん'   # 京王京王線 -> Keio Line
+            break
+    suffix = ''; body_k = rest_k; route = ''
+    m = re.match(r'^([0-9０-９A-ZＡ-Ｚ]+)系統', rest_j)
+    if m:
+        route = 'Route ' + m.group(1).translate(FW); body_k = ''
+        if kpar and par.endswith('線'):
+            route += ' (' + en_name_kana(kpar[:-2] if kpar.endswith('せん') else kpar) + ' Line)'; par = ''
+    elif rest_j.endswith('新幹線') and body_k.endswith('しんかんせん'): suffix, body_k = ' Shinkansen', body_k[:-6]
+    elif rest_j.endswith('本線') and body_k.endswith('ほんせん'): suffix, body_k = ' Main Line', body_k[:-4]
+    elif rest_j.endswith('線') and body_k.endswith('せん'): suffix, body_k = ' Line', body_k[:-2]
+    elif rest_j.endswith('ライン') and body_k.endswith('らいん'): suffix, body_k = ' Line', body_k[:-3]
+    body = en_name_kana(body_k) if body_k else ''
+    tail = route or (body + suffix).strip()
+    if not route and not body and brand.endswith(('Line', 'Express', 'Rail')): tail = ''
+    out = ' '.join(x for x in (brand, tail) if x).strip() or name
+    if par:
+        ends = [x.strip() for x in re.split(r'[～~〜]', par)]
+        if len(ends) >= 2 and st_lookup and norm(ends[0]) in st_lookup and norm(ends[1]) in st_lookup:
+            out += ' (%s–%s)' % (st_lookup[norm(ends[0])], st_lookup[norm(ends[1])])
+        elif par in PAREN_WORDS: out += ' (%s)' % PAREN_WORDS[par]
+    return out
 
 # ---------------------------------------------------------------- classification
 JR_GROUP = {'北海道旅客鉄道': 'JR Hokkaido', '東日本旅客鉄道': 'JR East', '東海旅客鉄道': 'JR Central', '西日本旅客鉄道': 'JR West',
@@ -99,6 +137,7 @@ def city_km(lat, lon): return min(math.hypot((lat - a) * 111, (lon - b) * 91) fo
 sdb_dir = os.path.join(args.sdb, 'out', 'main')
 stations = {s['code']: s for s in json.load(open(os.path.join(sdb_dir, 'station.json')))}
 line_meta = json.load(open(os.path.join(sdb_dir, 'line.json')))
+symbols = {int(r['code']): r['symbol'] for r in csv.DictReader(open(os.path.join(sdb_dir, 'line.csv'), encoding='utf-8')) if r['symbol'] not in ('', 'NULL')}
 n02 = json.load(open(os.path.join(args.mlit, 'data', 'stations.json')))
 cur = json.load(open(args.curated))
 
@@ -152,6 +191,8 @@ for lm in line_meta:
         i = sid(s['code'])
         if not ids or ids[-1] != i: ids.append(i)
     if len(ids) < 2: continue
+    # service patterns that only re-run other lines' tracks (they would draw a second copy on top of them)
+    if re.search(r'湘南新宿ライン|上野東京ライン|成田エクスプレス|ライナー|スカイアクセス', lm['name']): dropped['service pattern'] += 1; continue
     # operator + railway type via N02
     votes = collections.Counter()
     for s in sl:
@@ -198,13 +239,37 @@ for lm in line_meta:
     code_src = re.sub(r'^(JR|東京メトロ|都営|東京都交通局|名古屋市営地下鉄|大阪メトロ|京都市営地下鉄|横浜市営地下鉄)', '', name) or name
     code = (op and code_src.startswith(op) and code_src[len(op):] or code_src)[:2] or name[:2]
     ja = name if (len(name) > 3 or op in name) else (op + name if op else name)
-    en = en_line(name, d.get('name_kana'))
-    if len(name) <= 3 and op: en = (op + ' ' + en).strip()
+    st_lookup = {norm(x['name']): en_station(x['name'], x.get('name_kana')) for x in sl}
+    en = en_line(name, d.get('name_kana'), st_lookup)
+    if len(name) <= 3 and op in OP_EN and not en.startswith(OP_EN[op].split()[0]): en = (OP_EN[op] + ' ' + en).strip()
+    # official station numbering (駅ナンバリング): use it when most stops carry a number with the line's symbol
+    NUM_RE = re.compile(r'^([A-Za-z]{1,4})[\s\-]?(\d{1,3})$')
+    per = []
+    for x in sl:
+        ms = [NUM_RE.match(n) for n in (x.get('numbering') or [])]
+        per.append([(m.group(1).upper(), int(m.group(2))) for m in ms if m])
+    sym = (symbols.get(lm['code']) or '').upper()
+    if not sym:
+        cnt = collections.Counter(pfx for ps in per for pfx, _ in ps)
+        sym = cnt.most_common(1)[0][0] if cnt else ''
+    picked = [next((n for pfx, n in ps if pfx == sym), None) for ps in per]
+    ids_chk = []
+    for x in sl:
+        i = sid(x['code'])
+        if not ids_chk or ids_chk[-1] != i: ids_chk.append(i)
+    numbered = bool(sym) and sum(n is not None for n in picked) >= max(2, 0.5 * len(sl)) and ids_chk == ids
+    if numbered:
+        toks, last_id = [], None
+        for x, n in zip(sl, picked):
+            i = sid(x['code'])
+            if i == last_id: continue
+            last_id = i; toks.append('%s:%s' % (i, n if n is not None else '!'))
+        code = sym
     regions = {REGION_OF.get(stations[s['code']]['prefecture'], 'kanto') for s in sl}
     color = lm.get('color') or None
     out_lines.append(dict(code=lm['code'], regions=sorted(regions), ids=ids, sl=sl, def_=dict(
         id='x%d' % lm['code'], code=code, type=typ, grp=grp, op=op or '', en=en, ja=ja, color=color, v=round(v), dwell=dwell,
-        freq=[round(f, 1) for f in freq], first=first, last=last, nonum=True, st=' '.join(ids))))
+        freq=[round(f, 1) for f in freq], first=first, last=last, **({} if numbered else {'nonum': True}), st=' '.join(toks if numbered else ids), opEn=OP_EN.get(op, ''))))
     for s, i in zip(sl, [sid(s['code']) for s in sl]):
         used_stations[i] = (i, en_station(s['name'], s.get('name_kana')), s['name'], s['lat'], s['lng'])
 

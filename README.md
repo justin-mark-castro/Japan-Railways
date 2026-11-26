@@ -57,31 +57,37 @@ Caveats: the "area" is the prefecture whose capital is nearest the view centre �
 ## Nationwide import (all railways, trams, monorails)
 Every region has two parts: a hand-curated file (`js/regions/<id>.js`, higher quality) and an **auto-generated** file (`js/regions/auto/<id>.js`) built from open data. `js/regions/auto/trunk.js` holds lines that cross region borders and loads at start-up with the Shinkansen layer; Kanto's auto file also loads at start-up, the rest load when you zoom into their prefectures. Currently ~620 lines and ~9,000 stations: JR, private railways, subways, trams (Sapporo, Hakodate, Toyama, Fukui, Kyoto's Randen, Hiroshima, Matsuyama, Kochi, Kumamoto, Nagasaki, Kagoshima, Okinawa's monorail…), monorails, AGT and cable lines.
 
-Regenerate (needs Python 3 and Node, plus two open-data clones):
+Regenerate (needs Python 3 with numpy/scipy, and Node, plus two open-data clones):
 ```bash
 git clone --depth 1 https://github.com/Seo-4d696b75/station_database /tmp/ext/station_database
 git clone --depth 1 https://github.com/antfu/mlit-json /tmp/ext/mlit-json
 node tools/import/dump-curated.mjs > /tmp/curated.json
-python3 tools/import/build-auto.py --sdb /tmp/ext/station_database --mlit /tmp/ext/mlit-json --curated /tmp/curated.json
+python3 tools/import/build-auto.py --sdb /tmp/ext/station_database --mlit /tmp/ext/mlit-json --curated /tmp/curated.json   # lines, stations, names, codes
+node tools/import/dump-all.mjs > /tmp/all.json
+python3 tools/import/build-shapes.py --mlit /tmp/ext/mlit-json --all /tmp/all.json                                      # real track shapes
 ```
-How it merges with the curated data: stations match by normalised Japanese name (within 3 km, or <60 m), curated lines win, and auto lines that duplicate a curated line are dropped or trimmed. `js/regions/fixes.js` (`TRS_GEO_FIX`) snaps hand-typed station coordinates to the accurate open-data positions.
+- **Merging with hand-made data:** stations match by normalised Japanese name (within 3 km, or <60 m); hand-made lines win, imported lines that duplicate one are dropped or trimmed, and service patterns that only re-run other lines (Shonan-Shinjuku Line, Narita Express…) are skipped. `js/regions/fixes.js` (`TRS_GEO_FIX`) snaps hand-typed station coordinates to the accurate open-data positions.
+- **Track shapes:** `build-shapes.py` routes every station-to-station edge over the MLIT N02 railway sections (shortest path on a graph per railway type, preferring the line's own operator; ends are bridged where sections don't quite meet) and writes `js/regions/auto/<region>-shape.js` as simplified encoded polylines. Edges with no plausible route (about 1%) stay straight. A few Shinkansen stations whose hand-typed position was km off are moved onto the track. Trains run along the same curves, so line lengths and journey times use real path length.
+- **Official codes:** the station database carries station numbering and line symbols (JY17, S01, M08…) for about half of the imported lines; those lines show real codes and station numbers. Other lines get a Latin badge derived from the English name (for example "KA" for Kagoshima Main Line) and no station numbers.
+- **English names:** `tools/import/names_en.py` holds a hand-written table of ~150 operators (English name, line-name prefix and its kana reading). Line names are operator + romanised remainder + suffix (and an A–B section where the source splits a line); station names are romanised from kana with Higashi-/Nishi-/Shin- and -mae/-koen/-dori hyphenation. Japanese stays available (switch to 日本語, or see the secondary line).
 
 **Limitations (honest list)**
 - **Movements are simulated, not real timetables.** Speed and headway come from the railway type, station spacing and distance to the nearest big city (so a Tokyo-area line runs far more often than a rural one). Use the ODPT tools for real Tokyo data.
-- English names are machine-romanised from kana (e.g. long vowels and some place names will look odd); operator names are shown in Japanese. Line badge codes are the first two characters of the Japanese line name, not official codes.
-- Track shapes are straight lines between stations (MLIT's section polylines are not used yet), so curvy lines look simplified.
-- Curated and auto lines can overlap in central Tokyo, which gets visually busy. Some lines, branches, through-running services and recent openings/closures may be missing or out of date. Sapporo's tram is included; Shinkansen extensions under construction are not.
-- Region detection uses the nearest prefectural capital, not real borders.
+- English names are machine-romanised: expect odd results for unusual readings, compounds and some long-vowel cases, and the operator table may contain mistakes. Operators missing from the table keep Japanese names.
+- Station dots use their own coordinates, so a few hand-typed stations sit slightly off their track.
+- Centre Tokyo is dense; hand-made and imported lines can still run side by side. Some lines, branches, through-running services and recent openings/closures may be missing or out of date. Shinkansen extensions under construction are not included.
+- Region detection uses the nearest prefectural capital plus extra anchor points for Hokkaido and the islands, not real borders.
 
 ## Data sources and attribution
 - Stations, line order, kana and line colours: [station_database](https://github.com/Seo-4d696b75/station_database) by Seo-4d696b75, derived from 駅データ.jp — **CC BY 4.0**.
 - Operator and railway-type data: MLIT 国土数値情報 (National Land Numerical Information) railway data N02, via [antfu/mlit-json](https://github.com/antfu/mlit-json) — follow the MLIT terms of use and credit "国土交通省 国土数値情報".
+- Track geometry: the same MLIT railway data (sections).
 - Optional real timetables: [Public Transportation Open Data Center (ODPT)](https://www.odpt.org/) — follow each dataset's licence.
 
 ## Structure
 - `js/regions/shinkansen.js` – national Shinkansen layer (loads at start-up)
 - `js/regions/auto/`, `js/regions/fixes.js` – generated nationwide data (see *Nationwide import*)
-- `tools/import/` – open-data importer (`build-auto.py`, `dump-curated.mjs`)
+- `tools/import/` – open-data importer (`build-auto.py`, `build-shapes.py`, `names_en.py`, `dump-curated.mjs`, `dump-all.mjs`)
 - `js/regions.js`, `js/regions/` – prefectures, region loader and lazy region data
 - `js/data.js`, `js/data-extra.js` – stations, lines, colours, codes, frequencies
 - `js/station-badge.js` – station-number badges in Japanese signage style (JR rounded square, ring for Metro/Toei/private); SVG for the UI, canvas for map labels

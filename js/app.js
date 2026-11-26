@@ -10,14 +10,18 @@
   const RG = TRS_REGIONS;
   const ALL = { STATION_SRC: TRS_DATA.STATION_SRC, LINE_SRC: TRS_DATA.LINE_SRC.slice() };
   let net, stations, lines, byId;
+  const SHAPES = {}, SNAP = {};   // real track shapes + station snaps from js/regions/auto/*-shape.js
+  let netVer = 0;
   function buildNet() {
-    net = TRS.build(ALL, { geometry: Object.assign({}, window.TRS_GEO_FIX || {}, geoData && geoData.stations) });
+    netVer++;
+    net = TRS.build(ALL, { geometry: Object.assign({}, window.TRS_GEO_FIX || {}, SNAP, geoData && geoData.stations), shapes: SHAPES });
     ({ stations, lines, byId } = net);
     Object.values(stations).forEach(st => { st.pref = RG.nearestPref(st.lat, st.lon).id; });
     lines.forEach(L => { L.prefs = new Set(L.ids.map(id => stations[id].pref)); });
   }
   buildNet();
   const $ = id => document.getElementById(id);
+  const opName = L => (S.lang === 'en' && L.opEn) || L.op;
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const lerp = (a, b, t) => a + (b - a) * t;
 
@@ -68,7 +72,8 @@
   prepPois();
 
   /* ---------------- canvas ---------------- */
-  const cv = $('map'), ctx = cv.getContext('2d');
+  const cv = $('map'), mainCtx = cv.getContext('2d');
+  let ctx = mainCtx;   // swapped to the off-screen map layer while it is being redrawn
   const THEME = {
     dark: { bg: '#0c1117', water: '#0f2233', river: '#12293d', park: 'rgba(60,120,80,.18)', grid: 'rgba(255,255,255,.035)', casing: 'rgba(5,9,14,.85)', stFill: '#f4f7fa', stStroke: '#0a0f15', label: '#e8eef5', halo: 'rgba(12,17,23,.9)', sub: '#8fa1b5' },
     light: { bg: '#eef2f6', water: '#cfe3f3', river: '#c4dcef', park: 'rgba(90,170,110,.22)', grid: 'rgba(0,0,0,.04)', casing: 'rgba(255,255,255,.9)', stFill: '#ffffff', stStroke: '#26323f', label: '#14202c', halo: 'rgba(238,242,246,.95)', sub: '#5d6f82' }
@@ -107,19 +112,40 @@
   }
 
   /* ---------------- per-frame geometry ---------------- */
+  const DETAIL_S = 0.0035;   // below this zoom (m→px) only Shinkansen follow their real track shape
   function lineScreen(L, spacing) {
     const P = L.pts.map(p => ({ x: sx(p.x), y: sy(p.y) }));
     const n = P.length, out = new Array(n);
     const nrm = (a, b) => { const dx = b.x - a.x, dy = b.y - a.y, l = Math.hypot(dx, dy) || 1; return { x: -dy / l, y: dx / l }; };
+    const miter = (a, b) => {
+      if (a && b) { const k = 1 + a.x * b.x + a.y * b.y; return { x: (a.x + b.x) / Math.max(k, 0.55), y: (a.y + b.y) / Math.max(k, 0.55) }; }
+      return a || b;
+    };
     for (let i = 0; i < n; i++) {
       const a = i > 0 ? nrm(P[i - 1], P[i]) : null, b = i < n - 1 ? nrm(P[i], P[i + 1]) : null;
-      let vx, vy;
-      if (a && b) {
-        const k = 1 + a.x * b.x + a.y * b.y;
-        vx = (a.x + b.x) / Math.max(k, 0.55); vy = (a.y + b.y) / Math.max(k, 0.55);
-      } else { const q = a || b; vx = q.x; vy = q.y; }
-      const o = L.lane[i] * spacing;
-      out[i] = { x: P[i].x + vx * o, y: P[i].y + vy * o };
+      const q = miter(a, b), o = L.lane[i] * spacing;
+      out[i] = { x: P[i].x + q.x * o, y: P[i].y + q.y * o };
+    }
+    if (L.hasShape && (S.cam.s >= DETAIL_S || L.type === 'shin')) {
+      const det = out.det = new Array(n - 1).fill(null);
+      const x0 = wx(0), x1 = wx(S.W), y0 = wy(0), y1 = wy(S.H);
+      for (let i = 0; i < n - 1; i++) {
+        const ch = L.chain[i]; if (!ch) continue;
+        const bb = L.ebox[i];
+        if (bb.x1 < x0 || bb.x0 > x1 || bb.y1 < y0 || bb.y0 > y1) continue;   // off-screen edges stay straight (not visible anyway)
+        const m = ch.length, Q = new Array(m), l0 = L.lane[i], l1 = L.lane[i + 1];
+        for (let k = 0; k < m; k++) Q[k] = { x: sx(ch[k].x), y: sy(ch[k].y) };
+        if (l0 || l1) {
+          const ec = L.ecum[i], tot = ec[m - 1] || 1, R = new Array(m);
+          for (let k = 0; k < m; k++) {
+            if (k === 0) { R[0] = out[i]; continue; }
+            if (k === m - 1) { R[k] = out[i + 1]; continue; }
+            const q = miter(nrm(Q[k - 1], Q[k]), nrm(Q[k], Q[k + 1])), o = lerp(l0, l1, ec[k] / tot) * spacing;
+            R[k] = { x: Q[k].x + q.x * o, y: Q[k].y + q.y * o };
+          }
+          det[i] = R;
+        } else { Q[0] = out[i]; Q[m - 1] = out[i + 1]; det[i] = Q; }
+      }
     }
     return out;
   }
@@ -128,15 +154,36 @@
     const span = L.cum[i + 1] - L.cum[i] || 1;
     return { i, u: clamp((d - L.cum[i]) / span, 0, 1) };
   }
+  // point + heading at fraction u (by length) along a polyline whose cumulative metres are ec
+  function alongChain(Q, ec, u, i0) {
+    const tgt = u * ec[ec.length - 1];
+    let k = TRS.lowerBound(ec, tgt) - 1; k = clamp(k, 0, Q.length - 2);
+    const span = ec[k + 1] - ec[k] || 1, t = clamp((tgt - ec[k]) / span, 0, 1), a = Q[k], b = Q[k + 1];
+    return { x: lerp(a.x, b.x, t), y: lerp(a.y, b.y, t), ang: Math.atan2(b.y - a.y, b.x - a.x) };
+  }
   function posScreen(L, ss, d) {
     const { i, u } = segAt(L, d);
+    const q = ss.det && ss.det[i];
+    if (q) return alongChain(q, L.ecum[i], u);
     const a = ss[i], b = ss[i + 1];
     return { x: lerp(a.x, b.x, u), y: lerp(a.y, b.y, u), ang: Math.atan2(b.y - a.y, b.x - a.x) };
   }
   function posWorld(L, d) {
     const { i, u } = segAt(L, d);
+    if (L.chain[i]) return alongChain(L.chain[i], L.ecum[i], u);
     const a = L.pts[i], b = L.pts[i + 1];
     return { x: lerp(a.x, b.x, u), y: lerp(a.y, b.y, u) };
+  }
+  // screen polyline of the line between two distances along it (d0 < d1)
+  function pathPts(L, ss, d0, d1) {
+    const a = segAt(L, d0), b = segAt(L, d1), out = [posScreen(L, ss, d0)];
+    for (let e = a.i; e <= b.i; e++) {
+      if (e > a.i && L.cum[e] > d0 && L.cum[e] < d1) out.push(ss[e]);
+      const q = ss.det && ss.det[e];
+      if (q) for (let k = 1; k < q.length - 1; k++) { const dk = L.cum[e] + L.ecum[e][k]; if (dk > d0 && dk < d1) out.push(q[k]); }
+    }
+    out.push(posScreen(L, ss, d1));
+    return out;
   }
 
   /* ---------------- visibility ---------------- */
@@ -201,7 +248,18 @@
       const ss = lineSS[L.id] = lineScreen(L, spacing);
       const lw = L.type === 'shin' ? Math.max(w * 1.25, s < 0.006 ? 2.4 : 0) : L.type === 'jr' ? w * 1.12 : w * 0.92;
       ctx.globalAlpha = focus && focus !== L ? 0.16 : 1;
-      ctx.beginPath(); ss.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+      ctx.beginPath(); ctx.moveTo(ss[0].x, ss[0].y);
+      for (let i = 1; i < ss.length; i++) {
+        const q = ss.det && ss.det[i - 1];
+        if (q) {
+          let lx = q[0].x, ly = q[0].y;
+          for (let k = 1; k < q.length; k++) {
+            const pk = q[k];
+            if (k < q.length - 1 && Math.abs(pk.x - lx) + Math.abs(pk.y - ly) < 2.2) continue;   // skip sub-pixel detail
+            ctx.lineTo(pk.x, pk.y); lx = pk.x; ly = pk.y;
+          }
+        } else ctx.lineTo(ss[i].x, ss[i].y);
+      }
       ctx.strokeStyle = c.casing; ctx.lineWidth = lw + 2.6 * u; ctx.stroke();
       ctx.strokeStyle = L.color; ctx.lineWidth = lw; ctx.stroke();
       if ((L.type === 'jr' || L.type === 'shin') && lw >= 4) {
@@ -209,23 +267,23 @@
       }
     });
     ctx.globalAlpha = 1;
-    // focus highlight: route ahead for selected train
+    lineW = w;
+    return w;
+  }
+  let lineW = 2;
+  function drawRouteHighlight() {
+    const w = lineW, c = T();
     if (S.sel && S.sel.type === 'train') {
       const t = S.trainIdx[S.sel.id];
       if (t && lineSS[t.line.id]) {
         const L = t.line, ss = lineSS[L.id], tpl = t.tpl;
         const dEnd = tpl.cumAt[tpl.cumAt.length - 1];
         const a = Math.min(t.d, dEnd), b = Math.max(t.d, dEnd);
-        ctx.beginPath();
-        const pa = posScreen(L, ss, t.d); ctx.moveTo(pa.x, pa.y);
-        const ia = segAt(L, t.d).i, ib = segAt(L, dEnd).i;
-        if (tpl.dir === 0) { for (let i = ia + 1; i <= ib; i++) ctx.lineTo(ss[i].x, ss[i].y); }
-        else { for (let i = ia; i > ib; i--) ctx.lineTo(ss[i].x, ss[i].y); }
-        const pe = posScreen(L, ss, dEnd); ctx.lineTo(pe.x, pe.y);
+        let rp = pathPts(L, ss, a, b); if (tpl.dir === 1) rp.reverse();
+        ctx.beginPath(); rp.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
         ctx.strokeStyle = '#fff'; ctx.globalAlpha = .85; ctx.lineWidth = Math.max(1.5, w * 0.35); ctx.setLineDash([2, 5]); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
       }
     }
-    return w;
   }
 
   function stationVisibleLines(st) { return st.lines.filter(x => isVisible(x.line) && !x.skipped); }
@@ -473,6 +531,7 @@
     ctx.globalAlpha = 1; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
   }
 
+  const layer = document.createElement('canvas'); let layerKey = '';
   function frame(now) {
     const dt = Math.min((now - (frame.last || now)) / 1000, 0.1); frame.last = now;
     // time
@@ -494,8 +553,18 @@
       else { S.follow = null; }
     }
     ctx.setTransform(S.dpr, 0, 0, S.dpr, 0, 0);
-    drawBackground();
-    const w = drawLines();
+    // background + lines are costly to rasterise, so they live in an off-screen layer that is only redrawn when something about them changes
+    const fl = selectedLine();
+    const key = [S.cam.x.toFixed(2), S.cam.y.toFixed(2), S.cam.s.toFixed(7), S.W, S.H, S.dpr, S.ui, S.theme, S.opts.water, netVer, lines.length, S.hidden.size, fl ? fl.id : '', S.hidden.size < 40 ? [...S.hidden].join(',') : ''].join('|');
+    if (layer.width !== cv.width || layer.height !== cv.height) { layer.width = cv.width; layer.height = cv.height; layerKey = ''; }
+    if (key !== layerKey) {
+      ctx = layer.getContext('2d'); ctx.setTransform(S.dpr, 0, 0, S.dpr, 0, 0);
+      drawBackground(); drawLines();
+      ctx = mainCtx; layerKey = key;
+    }
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(layer, 0, 0); ctx.setTransform(S.dpr, 0, 0, S.dpr, 0, 0);
+    const w = lineW;
+    drawRouteHighlight();
     drawStations(w);
     drawPois();
     drawPrefs();
@@ -573,7 +642,7 @@
         html += `<div class="lrow ${S.hidden.has(L.id) ? 'off' : ''} ${S.sel && S.sel.type === 'line' && S.sel.id === L.id ? 'active' : ''}" data-id="${L.id}" style="--c:${L.color};--tc:${L.textColor}">
           <button class="eye" data-eye="${L.id}" aria-label="Toggle ${L.en}">${S.hidden.has(L.id) ? '' : '✓'}</button>
           ${bdg(L)}
-          <div class="nm"><b>${lineName(L)}</b><small>${L.type === 'pvt' || L.type === 'tram' || L.type === 'mono' || L.type === 'shin' ? L.op + ' · ' : ''}${nm2(L)} · ${L.n} stn</small></div>
+          <div class="nm"><b>${lineName(L)}</b><small>${L.type === 'pvt' || L.type === 'tram' || L.type === 'mono' || L.type === 'shin' ? opName(L) + ' · ' : ''}${nm2(L)} · ${L.n} stn</small></div>
           <span class="cnt" data-l="${L.id}" title="trains running">0</span></div>`;
       });
     });
@@ -688,7 +757,7 @@
         <span class="tm">${skip ? 'pass' : L.label(i)}</span></div>`;
     }).join('');
     return `<div class="p-head" style="--c:${L.color}">${closeBtn}
-      <div class="bdg">${sym(L)}<span class="p-sub">${L.op}</span></div>
+      <div class="bdg">${sym(L)}<span class="p-sub">${opName(L)}</span></div>
       <div class="p-title">${nm(L)}</div><div class="p-sub">${nm2(L)}</div><div class="hero-bar"></div></div>
       <div class="p-body" style="--c:${L.color}">
         <div id="lineLive">${lineLiveHTML(L)}</div>
@@ -725,7 +794,7 @@
     return `<div class="p-head" style="--c:${L.color}">${closeBtn}
       <div class="bdg">${sym(L)}<span class="live">${S.follow === t.key ? 'following' : 'live (simulated)'}</span></div>
       <div class="p-title">${L.loop ? dest : (S.lang === 'ja' ? dest + ' 行き' : 'To ' + dest)}</div>
-      <div class="p-sub">${nm(L)} · ${L.op}</div><div class="hero-bar"></div></div>
+      <div class="p-sub">${nm(L)} · ${opName(L)}</div><div class="hero-bar"></div></div>
       <div class="p-body" style="--c:${L.color}">
         <div style="font-size:14px;line-height:1.5">${status}</div>
         <div class="btn-row"><button class="btn primary" data-act="follow">${S.follow === t.key ? 'Stop following' : 'Follow this train'}</button><button class="btn" data-act="line">Show line</button></div>
@@ -796,7 +865,7 @@
           <div class="t"><b>${nm(it.pf)}</b><small>${nm2(it.pf)} · ${regionHasData(it.pf.id) ? 'line data available' : 'no line data yet'}</small></div><span class="kind">area</span></div>`;
       }
       const L = it.L;
-      return `<div class="res ${i === resSel ? 'sel' : ''}" data-i="${i}">${bdg(L)}<div class="t"><b>${nm(L)}</b><small>${nm2(L)} · ${L.op}</small></div><span class="kind">line</span></div>`;
+      return `<div class="res ${i === resSel ? 'sel' : ''}" data-i="${i}">${bdg(L)}<div class="t"><b>${nm(L)}</b><small>${nm2(L)} · ${opName(L)}</small></div><span class="kind">line</span></div>`;
     }).join('');
   }
   function pickResult(i) {
@@ -997,10 +1066,11 @@
 
   function addRegionData(id, d) {
     const have = new Set(Object.keys(stations));
-    const rows = d.STATION_SRC.trim().split('\n').filter(r => r.trim() && !have.has(r.split('|')[0]));
+    const rows = (d.STATION_SRC || '').trim().split('\n').filter(r => r.trim() && !have.has(r.split('|')[0]));
     ALL.STATION_SRC += '\n' + rows.join('\n') + '\n';
     const lineIds = new Set(ALL.LINE_SRC.map(l => l.id));
-    d.LINE_SRC.forEach(l => { if (!lineIds.has(l.id)) ALL.LINE_SRC.push(l); });
+    (d.LINE_SRC || []).forEach(l => { if (!lineIds.has(l.id)) ALL.LINE_SRC.push(l); });
+    Object.assign(SHAPES, d.SHAPE || {}); Object.assign(SNAP, d.SNAP || {});
     (d.POIS || []).forEach(p => { if (!poiById[p.id]) POI.push(p); });
     (d.WATER || []).forEach(poly => WATER_POLYS.push(poly.map(q => TRS.proj(q[0], q[1]))));
     buildNet(); prepPois(); computeOps();
@@ -1009,20 +1079,20 @@
     if (window.__TRS) window.__TRS.net = net;
   }
   const loadedParts = new Set(['kanto']);   // 'kanto' = built-in hand-authored Tokyo data
-  const loadScript = src => new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = src; sc.onload = res; sc.onerror = rej; document.head.appendChild(sc); });
+  const loadScript = src => new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = src + '?v=' + (window.TRS_VERSION || ''); sc.onload = res; sc.onerror = rej; document.head.appendChild(sc); });
   function loadRegion(r) {
     if (!r || loadingRegions.has(r.id)) return;
-    const parts = [r.file && { key: r.id, file: r.file }, r.auto && { key: r.id + '-auto', file: r.auto }].filter(p => p && !loadedParts.has(p.key));
+    const parts = [r.file && { key: r.id, file: r.file }, r.auto && { key: r.id + '-auto', file: r.auto }, r.auto && { key: r.id + '-shape', file: r.auto.replace(/\.js$/, '-shape.js'), optional: true }].filter(p => p && !loadedParts.has(p.key));
     if (!parts.length) { loadedRegions.add(r.id); return; }
     loadingRegions.add(r.id); if (!r.national) toast('Loading ' + r.en + ' lines…', 6000);
     (async () => {
       let nLines = 0;
       try {
         for (const p of parts) {
-          await loadScript(p.file);
+          try { await loadScript(p.file); } catch (e) { if (p.optional) continue; throw e; }
           const d = (window.TRS_REGIONS_DATA || {})[p.key];
-          if (!d) throw new Error('empty');
-          addRegionData(p.key, d); loadedParts.add(p.key); nLines += d.LINE_SRC.length;
+          if (!d) { if (p.optional) continue; throw new Error('empty'); }
+          addRegionData(p.key, d); loadedParts.add(p.key); nLines += (d.LINE_SRC || []).length;
         }
         loadedRegions.add(r.id);
         if (!r.national) toast(r.en + ' loaded: ' + nLines + ' lines');

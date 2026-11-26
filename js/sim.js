@@ -22,7 +22,43 @@
     return (0.299 * r + 0.587 * gg + 0.114 * b) / 255;
   }
 
+  // Google-polyline decoder (precision 1e5) -> projected world points, cached per encoded string
+  const shapeCache = new Map();
+  function decodeShape(enc) {
+    let hit = shapeCache.get(enc);
+    if (hit) return hit;
+    const out = []; let i = 0, la = 0, lo = 0;
+    while (i < enc.length) {
+      let sh = 0, r = 0, b;
+      do { b = enc.charCodeAt(i++) - 63; r |= (b & 31) << sh; sh += 5; } while (b >= 32);
+      la += (r & 1) ? ~(r >> 1) : r >> 1; sh = 0; r = 0;
+      do { b = enc.charCodeAt(i++) - 63; r |= (b & 31) << sh; sh += 5; } while (b >= 32);
+      lo += (r & 1) ? ~(r >> 1) : r >> 1;
+      out.push(proj(la / 1e5, lo / 1e5));
+    }
+    shapeCache.set(enc, out);
+    return out;
+  }
+  const SHAPE_GROUP = { jr: 'j', shin: 'k', tram: 't', mono: 'm' };   // everything else 'p' (see tools/import/build-shapes.py)
+
+  // Badge codes must be Latin: lines imported without an official symbol get letters derived from their English name
+  const CODE_SKIP = /^(JR|Line|Main|Railway|Railroad|Electric|Tram|Subway|Route|Shinkansen|Monorail|Rapid|Express|Metro|Transit|Rail|Tokyo|Osaka|Kobe|Nagoya|Kyoto|Sapporo|Fukuoka|Sendai|Yokohama|City|Municipal|Kotsu|Tetsudo|Dentetsu|Tramway)$/i;
+  function latinCodes(defs) {
+    const used = new Set(defs.map(d => d.code).filter(c => /^[\x20-\x7e]+$/.test(c)));
+    defs.forEach(d => {
+      if (/^[\x20-\x7e]+$/.test(d.code || '')) return;
+      const words = String(d.en || '').replace(/\(.*?\)/g, ' ').split(/[^A-Za-z]+/).filter(Boolean);
+      const w = (words.find(x => !CODE_SKIP.test(x)) || words[0] || 'X').toUpperCase();
+      const cands = [];
+      for (let k = 1; k < w.length; k++) cands.push(w[0] + w[k]);
+      cands.push(w.slice(0, 2), w[0]);
+      d.code = cands.find(c => c && !used.has(c)) || cands[0] || 'X';
+      used.add(d.code);
+    });
+  }
+
   function build(src, opts) {
+    latinCodes(src.LINE_SRC);
     opts = opts || {};
     const geo = opts.geometry || {};
     const stations = {};
@@ -42,6 +78,7 @@
         const [id, n] = tok.split(':');
         if (!stations[id]) throw new Error('Unknown station ' + id + ' in ' + def.id);
         if (n === '-') { nums.push(null); passSet.push(id); }
+        else if (n === '!') nums.push(null);   // a stop without a station number
         else { num = n !== undefined ? +n : num + 1; nums.push(num); }
         ids.push(id);
       });
@@ -49,13 +86,33 @@
       const V = def.loop ? n + 1 : n;
       const pts = [];
       for (let i = 0; i < V; i++) { const s = stations[ids[i % n]]; pts.push({ x: s.x, y: s.y }); }
+      // optional real track shape between consecutive stations: chain[i] = world points incl. both stations, ecum[i] = cumulative metres
+      const shp = opts.shapes, gl = SHAPE_GROUP[def.type] || 'p';
+      const chain = new Array(V - 1).fill(null), ecum = new Array(V - 1).fill(null), ebox = new Array(V - 1).fill(null);
       const cum = [0];
-      for (let i = 1; i < V; i++) cum.push(cum[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y));
       let bx0 = 1e12, bx1 = -1e12, by0 = 1e12, by1 = -1e12;
       pts.forEach(p => { bx0 = Math.min(bx0, p.x); bx1 = Math.max(bx1, p.x); by0 = Math.min(by0, p.y); by1 = Math.max(by1, p.y); });
+      for (let i = 1; i < V; i++) {
+        const a = ids[(i - 1) % n], b = ids[i % n], p0 = pts[i - 1], p1 = pts[i];
+        let len = Math.hypot(p1.x - p0.x, p1.y - p0.y);
+        const enc = shp && shp[(a < b ? a + '|' + b : b + '|' + a) + '|' + gl];
+        if (enc) {
+          let inner = decodeShape(enc);
+          if (inner.length) {
+            if (a > b) inner = inner.slice().reverse();
+            const ch = [p0].concat(inner, [p1]), ec = [0];
+            let x0 = 1e12, x1 = -1e12, y0 = 1e12, y1 = -1e12;
+            for (let k = 1; k < ch.length; k++) ec.push(ec[k - 1] + Math.hypot(ch[k].x - ch[k - 1].x, ch[k].y - ch[k - 1].y));
+            ch.forEach(q => { x0 = Math.min(x0, q.x); x1 = Math.max(x1, q.x); y0 = Math.min(y0, q.y); y1 = Math.max(y1, q.y); });
+            chain[i - 1] = ch; ecum[i - 1] = ec; ebox[i - 1] = { x0, x1, y0, y1 }; len = ec[ec.length - 1];
+            bx0 = Math.min(bx0, x0); bx1 = Math.max(bx1, x1); by0 = Math.min(by0, y0); by1 = Math.max(by1, y1);
+          }
+        }
+        cum.push(cum[i - 1] + len);
+      }
       const skip = new Set((def.skip || '').split(/\s+/).filter(Boolean).concat(passSet));
       const L = Object.assign({}, def, {
-        order, ids, nums, n, V, pts, cum, len: cum[V - 1], skip, bbox: { x0: bx0, x1: bx1, y0: by0, y1: by1 },
+        order, ids, nums, n, V, pts, cum, chain, ecum, ebox, hasShape: chain.some(Boolean), len: cum[V - 1], skip, bbox: { x0: bx0, x1: bx1, y0: by0, y1: by1 },
         textColor: lum(def.color) > 0.62 ? '#111' : '#fff',
         grp: def.grp || def.op,
         label: i => (def.nonum || nums[i % n] == null ? '' : def.code + String(nums[i % n]).padStart(2, '0')),
