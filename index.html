@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>東京 Rail Sim — Tokyo JR &amp; Subway Simulation</title>
+<meta name="description" content="A live schedule-driven simulation of Tokyo's JR East and subway lines for rail fans, with line codes, colours, search and filters.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%239ACD32'/%3E%3Ctext x='16' y='22' font-size='16' font-weight='800' text-anchor='middle' font-family='sans-serif' fill='%23111'%3EJY%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+  <header id="topbar">
+    <button id="menuBtn" class="icon-btn only-mobile" aria-label="Lines menu">☰</button>
+    <div class="brand">
+      <span class="brand-mark">JY</span>
+      <div class="brand-text"><b>東京 Rail Sim</b><small>JR East &amp; Subway · schedule playback</small></div>
+    </div>
+    <div class="search">
+      <svg viewBox="0 0 24 24" width="18" height="18"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="m16 16 5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <input id="q" type="search" autocomplete="off" spellcheck="false" placeholder="Search station, line or code — Shinjuku, 新宿, JY17, Ginza…">
+      <kbd>/</kbd>
+      <div id="results" class="results" hidden></div>
+    </div>
+    <div class="top-actions">
+      <button id="langBtn" class="pill" title="Toggle language">EN</button>
+      <button id="themeBtn" class="pill" title="Toggle theme">◐</button>
+    </div>
+  </header>
+
+  <aside id="sidebar">
+    <div class="side-head">
+      <h2>Lines</h2>
+      <div class="chips" id="opChips"></div>
+      <input id="lineFilter" type="search" placeholder="Filter lines (e.g. Yamanote, JC, Toei)…">
+      <div class="quick">
+        <button data-q="all">All</button>
+        <button data-q="none">None</button>
+        <button data-q="jr">JR</button>
+        <button data-q="subway">Subway</button>
+      </div>
+    </div>
+    <div id="lineList" class="line-list"></div>
+    <div class="side-foot">
+      <h3>Display</h3>
+      <label class="tog"><input type="checkbox" id="optTrains" checked><span>Trains</span></label>
+      <label class="tog"><input type="checkbox" id="optNames" checked><span>Station names</span></label>
+      <label class="tog"><input type="checkbox" id="optBadges" checked><span>Line codes at stations</span></label>
+      <label class="tog"><input type="checkbox" id="optInter"><span>Interchanges only</span></label>
+      <label class="tog"><input type="checkbox" id="optWater" checked><span>Bay &amp; rivers</span></label>
+    </div>
+  </aside>
+
+  <main id="stage">
+    <canvas id="map"></canvas>
+    <div id="tip" class="tip" hidden></div>
+    <div class="hud tl"><span id="hudTrains">0 trains</span><span id="hudPeriod">—</span></div>
+    <div class="hud-btns">
+      <button id="zin" class="icon-btn" aria-label="Zoom in">+</button>
+      <button id="zout" class="icon-btn" aria-label="Zoom out">−</button>
+      <button id="zfit" class="icon-btn" aria-label="Reset view" title="Reset view">⌖</button>
+    </div>
+    <div class="legend-note">Schematic map · positions approximate · timetable is simulated from line frequency &amp; speed, not official data</div>
+  </main>
+
+  <aside id="panel" hidden></aside>
+
+  <footer id="clockbar">
+    <button id="play" class="play" aria-label="Play / pause">❚❚</button>
+    <div class="clock"><b id="clock">08:00</b><small id="clockSec">:00</small><span id="clockTag">JST</span></div>
+    <input id="scrub" type="range" min="16200" max="102600" step="30" value="28800" aria-label="Time of day">
+    <div class="speeds" id="speeds"></div>
+    <div class="presets" id="presets"></div>
+  </footer>
+</div>
+<div id="scrim" hidden></div>
+<script src="js/data.js"></script>
+<script src="js/sim.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
