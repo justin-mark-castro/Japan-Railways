@@ -75,8 +75,8 @@
   const cv = $('map'), mainCtx = cv.getContext('2d');
   let ctx = mainCtx;   // swapped to the off-screen map layer while it is being redrawn
   const THEME = {
-    dark: { bg: '#0c1117', sea: '#0a1520', land: '#141d28', coast: 'rgba(124,196,255,.28)', border: 'rgba(255,255,255,.07)', water: '#0f2233', river: '#12293d', park: 'rgba(60,120,80,.18)', grid: 'rgba(255,255,255,.035)', casing: 'rgba(5,9,14,.85)', stFill: '#f4f7fa', stStroke: '#0a0f15', label: '#e8eef5', halo: 'rgba(12,17,23,.9)', sub: '#8fa1b5' },
-    light: { bg: '#eef2f6', sea: '#d6e6f3', land: '#f8faf6', coast: 'rgba(40,90,140,.35)', border: 'rgba(0,0,0,.09)', water: '#cfe3f3', river: '#c4dcef', park: 'rgba(90,170,110,.22)', grid: 'rgba(0,0,0,.04)', casing: 'rgba(255,255,255,.9)', stFill: '#ffffff', stStroke: '#26323f', label: '#14202c', halo: 'rgba(238,242,246,.95)', sub: '#5d6f82' }
+    dark: { bg: '#0c1117', sea: '#060e17', land: '#131c26', coast: 'rgba(130,185,230,.68)', glow: 'rgba(90,150,200,.10)', border: 'rgba(150,170,195,.28)', water: '#0f2233', river: '#12293d', park: 'rgba(60,120,80,.18)', grid: 'rgba(255,255,255,.035)', casing: 'rgba(5,9,14,.85)', stFill: '#f4f7fa', stStroke: '#0a0f15', label: '#e8eef5', halo: 'rgba(12,17,23,.9)', sub: '#8fa1b5' },
+    light: { bg: '#eef2f6', sea: '#c6dcee', land: '#f4f5f0', coast: 'rgba(55,100,150,.7)', glow: 'rgba(90,140,190,.16)', border: 'rgba(90,105,125,.35)', water: '#cfe3f3', river: '#c4dcef', park: 'rgba(90,170,110,.22)', grid: 'rgba(0,0,0,.04)', casing: 'rgba(255,255,255,.9)', stFill: '#ffffff', stStroke: '#26323f', label: '#14202c', halo: 'rgba(238,242,246,.95)', sub: '#5d6f82' }
   };
   const T = () => THEME[S.theme];
 
@@ -201,35 +201,39 @@
   }
 
   /* ---------------- drawing ---------------- */
+  // official line colours include near-black (invisible on the dark map) and pale yellows (invisible on the light one): nudge only the track stroke
+  function trackColor(L) {
+    const k = S.theme === 'dark' ? '_cd' : '_cl';
+    if (L[k]) return L[k];
+    const h = L.color.replace('#', ''), rgb = [0, 2, 4].map(i => parseInt(h.substr(i, 2), 16));
+    const lumOf = a => (0.299 * a[0] + 0.587 * a[1] + 0.114 * a[2]) / 255;
+    let a = rgb.slice();
+    if (S.theme === 'dark') { for (let t = 0; t <= 1 && lumOf(a) < 0.4; t += 0.04) a = rgb.map(v => Math.round(v + (255 - v) * t)); }
+    else { for (let t = 0; t <= 1 && lumOf(a) > 0.72; t += 0.04) a = rgb.map(v => Math.round(v * (1 - t))); }
+    return (L[k] = 'rgb(' + a.join(',') + ')');
+  }
   function drawBackground() {
-    const c = T();
-    ctx.fillStyle = c.bg; ctx.fillRect(0, 0, S.W, S.H);
+    const c = T(), full = S.opts.water;   // the "Land, bay & rivers" switch turns the whole base map off
+    ctx.fillStyle = full ? c.sea : c.bg; ctx.fillRect(0, 0, S.W, S.H);
+    // sea, land, coast and prefecture borders from the bundled outline data (flat background until the first level has loaded)
+    const hasLand = full && window.TRS_LANDVIEW.draw(ctx, { cx: S.cam.x, cy: S.cam.y, s: S.cam.s, W: S.W, H: S.H }, { land: c.land, coast: c.coast, halo: c.glow, border: c.border });
+    if (full && !hasLand) { ctx.fillStyle = c.bg; ctx.fillRect(0, 0, S.W, S.H); }
     // faint grid
     const step = S.cam.s > 0.12 ? 1000 : S.cam.s > 0.04 ? 2000 : 5000;
     ctx.strokeStyle = c.grid; ctx.lineWidth = 1; ctx.beginPath();
     for (let x = Math.floor(wx(0) / step) * step; x < wx(S.W); x += step) { const X = Math.round(sx(x)) + .5; ctx.moveTo(X, 0); ctx.lineTo(X, S.H); }
     for (let y = Math.floor(wy(0) / step) * step; y < wy(S.H); y += step) { const Y = Math.round(sy(y)) + .5; ctx.moveTo(0, Y); ctx.lineTo(S.W, Y); }
     ctx.stroke();
-    if (!S.opts.water) return;
-    const TT = window.TRS_TERRAIN, haveLand = !!(TT && TT.ready);
-    if (haveLand) {
-      // whole-of-Japan land mass in the same projection as the rails: sea first, then land, prefecture borders, coast
-      ctx.fillStyle = c.sea; ctx.fillRect(0, 0, S.W, S.H);
-      const lod = TT.lodFor(S.cam.s), x0 = wx(0), x1 = wx(S.W), y0 = wy(0), y1 = wy(S.H), vis = [];
-      TT.rings.forEach(r => { if (r.x1 >= x0 && r.x0 <= x1 && r.y1 >= y0 && r.y0 <= y1) vis.push(r.lods[lod]); });
-      const trace = () => { ctx.beginPath(); vis.forEach(a => { ctx.moveTo(sx(a[0]), sy(a[1])); for (let i = 2; i < a.length; i += 2) ctx.lineTo(sx(a[i]), sy(a[i + 1])); ctx.closePath(); }); };
-      trace(); ctx.fillStyle = c.land; ctx.fill('evenodd');
-      ctx.lineJoin = 'round'; ctx.strokeStyle = c.border; ctx.lineWidth = 1; ctx.stroke();
-      trace(); ctx.strokeStyle = c.coast; ctx.lineWidth = Math.max(1, Math.min(2.2, 0.8 + S.cam.s * 30)); ctx.stroke();
-    }
+    if (!full) return;
     // parks
     ctx.fillStyle = c.park;
     PARKS.forEach(p => { ctx.beginPath(); ctx.ellipse(sx(p.x), sy(p.y), p.rx * S.cam.s, p.ry * S.cam.s, 0, 0, 7); ctx.fill(); });
-    // bay (hand-drawn Tokyo Bay is only needed when the nationwide land layer failed to load)
-    if (!haveLand) ctx.fillStyle = c.water;
-    if (!haveLand) WATER_POLYS.forEach(poly => { ctx.beginPath(); poly.forEach((p, i) => (i ? ctx.lineTo(sx(p.x), sy(p.y)) : ctx.moveTo(sx(p.x), sy(p.y)))); ctx.closePath(); ctx.fill(); });
-    ctx.fillStyle = c.bg;
-    if (!haveLand) LAND_PTS.forEach(poly => { ctx.beginPath(); poly.forEach((p, i) => (i ? ctx.lineTo(sx(p.x), sy(p.y)) : ctx.moveTo(sx(p.x), sy(p.y)))); ctx.closePath(); ctx.fill(); });
+    if (!hasLand) {   // hand-drawn Tokyo bay, only needed while the outline data has not loaded
+      ctx.fillStyle = c.water;
+      WATER_POLYS.forEach(poly => { ctx.beginPath(); poly.forEach((p, i) => (i ? ctx.lineTo(sx(p.x), sy(p.y)) : ctx.moveTo(sx(p.x), sy(p.y)))); ctx.closePath(); ctx.fill(); });
+      ctx.fillStyle = c.bg;
+      LAND_PTS.forEach(poly => { ctx.beginPath(); poly.forEach((p, i) => (i ? ctx.lineTo(sx(p.x), sy(p.y)) : ctx.moveTo(sx(p.x), sy(p.y)))); ctx.closePath(); ctx.fill(); });
+    }
     ctx.strokeStyle = c.river; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     RIVER_PTS.forEach(r => {
       ctx.lineWidth = Math.max(1.5, r.w * S.cam.s * 55);
@@ -272,7 +276,7 @@
         } else ctx.lineTo(ss[i].x, ss[i].y);
       }
       ctx.strokeStyle = c.casing; ctx.lineWidth = lw + 2.6 * u; ctx.stroke();
-      ctx.strokeStyle = L.color; ctx.lineWidth = lw; ctx.stroke();
+      ctx.strokeStyle = trackColor(L); ctx.lineWidth = lw; ctx.stroke();
       if ((L.type === 'jr' || L.type === 'shin') && lw >= 4) {
         ctx.setLineDash([lw * 1.3, lw * 1.3]); ctx.strokeStyle = 'rgba(255,255,255,.75)'; ctx.lineWidth = Math.max(1, lw * 0.22); ctx.stroke(); ctx.setLineDash([]);
       }
@@ -567,7 +571,7 @@
     ctx.setTransform(S.dpr, 0, 0, S.dpr, 0, 0);
     // background + lines are costly to rasterise, so they live in an off-screen layer that is only redrawn when something about them changes
     const fl = selectedLine();
-    const key = [S.cam.x.toFixed(2), S.cam.y.toFixed(2), S.cam.s.toFixed(7), S.W, S.H, S.dpr, S.ui, S.theme, S.opts.water, (window.TRS_TERRAIN ? TRS_TERRAIN.ver : 0), netVer, lines.length, S.hidden.size, fl ? fl.id : '', S.hidden.size < 40 ? [...S.hidden].join(',') : ''].join('|');
+    const key = [S.cam.x.toFixed(2), S.cam.y.toFixed(2), S.cam.s.toFixed(7), S.W, S.H, S.dpr, S.ui, S.theme, S.opts.water, netVer, TRS_LANDVIEW.version(), lines.length, S.hidden.size, fl ? fl.id : '', S.hidden.size < 40 ? [...S.hidden].join(',') : ''].join('|');
     if (layer.width !== cv.width || layer.height !== cv.height) { layer.width = cv.width; layer.height = cv.height; layerKey = ''; }
     if (key !== layerKey) {
       ctx = layer.getContext('2d'); ctx.setTransform(S.dpr, 0, 0, S.dpr, 0, 0);

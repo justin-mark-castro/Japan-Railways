@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>東京 Rail Sim — Tokyo JR &amp; Subway Simulation</title>
-<meta name="description" content="A live schedule-driven simulation of Tokyo's JR East and subway lines for rail fans, with line codes, colours, search and filters.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%239ACD32'/%3E%3Ctext x='16' y='22' font-size='16' font-weight='800' text-anchor='middle' font-family='sans-serif' fill='%23111'%3EJY%3C/text%3E%3C/svg%3E">
+<title>Japan Rail Sim — live railway simulation of all Japan</title>
+<meta name="description" content="A live, schedule-driven simulation of Japan's railways — JR, Shinkansen, subways, private lines, trams and monorails — for rail fans, with line codes, search and filters.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%239ACD32'/%3E%3Ctext x='16' y='22' font-size='16' font-weight='800' text-anchor='middle' font-family='sans-serif' fill='%23111'%3EJP%3C/text%3E%3C/svg%3E">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -13,8 +13,8 @@
   <header id="topbar">
     <button id="menuBtn" class="icon-btn only-mobile" aria-label="Lines menu">☰</button>
     <div class="brand">
-      <span class="brand-mark">JY</span>
-      <div class="brand-text"><b>東京 Rail Sim</b><small>JR East &amp; Subway · schedule playback</small></div>
+      <span class="brand-mark">JP</span>
+      <div class="brand-text"><b>Japan Rail Sim</b><small>All of Japan · 日本の鉄道 · simulated timetable</small></div>
     </div>
     <div class="search">
       <svg viewBox="0 0 24 24" width="18" height="18"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="m16 16 5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
@@ -25,7 +25,7 @@
     <div class="top-actions">
       <a href="prefectures.html" class="pill" style="display:grid;place-items:center;text-decoration:none;color:var(--text)" title="All 47 prefectures">Prefectures</a>
       <button id="langBtn" class="pill" title="Toggle language">EN</button>
-      <button id="themeBtn" class="pill" title="Toggle theme">◐</button>
+      <button id="themeBtn" class="pill" title="Toggle light / dark" aria-label="Toggle light / dark"><svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
     </div>
   </header>
 
@@ -54,12 +54,12 @@
       </details>
       <details class="sec" id="secDisplay" open>
         <summary>Display</summary>
-        <div class="tgrid">
-          <label class="tog"><input type="checkbox" id="optTrains" checked><span>Trains</span></label>
-          <label class="tog"><input type="checkbox" id="optNames" checked><span>Station names</span></label>
-          <label class="tog"><input type="checkbox" id="optBadges" checked><span>Line codes</span></label>
-          <label class="tog"><input type="checkbox" id="optInter"><span>Interchanges only</span></label>
-          <label class="tog"><input type="checkbox" id="optWater" checked><span>Land, bay &amp; rivers</span></label>
+        <div class="tpills">
+          <label class="tp"><input type="checkbox" id="optTrains" checked><span>Trains</span></label>
+          <label class="tp"><input type="checkbox" id="optNames" checked><span>Station names</span></label>
+          <label class="tp"><input type="checkbox" id="optBadges" checked><span>Line codes</span></label>
+          <label class="tp"><input type="checkbox" id="optInter"><span>Interchanges only</span></label>
+          <label class="tp"><input type="checkbox" id="optWater" checked><span>Land, bay &amp; rivers</span></label>
         </div>
       </details>
       <details class="sec" id="secSpots">
@@ -69,7 +69,7 @@
       </details>
       <details class="sec" id="secAbout">
         <summary>About &amp; data sources</summary>
-        <p class="about">Stations, line order and colours outside the hand-made Tokyo/Shinkansen data come from open data: <a href="https://github.com/Seo-4d696b75/station_database" target="_blank" rel="noopener">station_database</a> (駅データ.jp, CC BY 4.0) and MLIT <a href="https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-N02-v3_1.html" target="_blank" rel="noopener">国土数値情報 N02</a>; optional real timetables from <a href="https://www.odpt.org/" target="_blank" rel="noopener">ODPT</a>. Train movements are <b>simulated</b> (not official timetables), English names are machine-romanised, and track shapes come from MLIT section geometry (a few edges fall back to straight lines).</p>
+        <p class="about">The land outline and prefecture borders come from 地球地図日本 (国土地理院 / GSI, via dataofjapan/land). Stations, line order and colours outside the hand-made Tokyo/Shinkansen data come from open data: <a href="https://github.com/Seo-4d696b75/station_database" target="_blank" rel="noopener">station_database</a> (駅データ.jp, CC BY 4.0) and MLIT <a href="https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-N02-v3_1.html" target="_blank" rel="noopener">国土数値情報 N02</a>; optional real timetables from <a href="https://www.odpt.org/" target="_blank" rel="noopener">ODPT</a>. Train movements are <b>simulated</b> (not official timetables), English names are machine-romanised, and track shapes come from MLIT section geometry (a few edges fall back to straight lines).</p>
       </details>
     </div>
   </aside>
@@ -93,7 +93,7 @@
       <button id="zout" class="icon-btn" aria-label="Zoom out">−</button>
       <button id="zfit" class="icon-btn" aria-label="Reset view" title="Reset view">⌖</button>
     </div>
-    <div class="legend-note">Simulated timetable, not official · Data: <a href="https://github.com/Seo-4d696b75/station_database" target="_blank" rel="noopener">駅データ.jp</a> (CC BY 4.0), <a href="https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-N02-v3_1.html" target="_blank" rel="noopener">MLIT</a>, <a href="https://www.odpt.org/" target="_blank" rel="noopener">ODPT</a></div>
+    <div class="legend-note">Simulated timetable, not official · Data: <a href="https://github.com/Seo-4d696b75/station_database" target="_blank" rel="noopener">駅データ.jp</a> (CC BY 4.0), <a href="https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-N02-v3_1.html" target="_blank" rel="noopener">MLIT</a>, <a href="https://www.odpt.org/" target="_blank" rel="noopener">ODPT</a>, <a href="https://www.gsi.go.jp/kankyochiri/gm_jpn.html" target="_blank" rel="noopener">地球地図日本/GSI</a></div>
   </main>
 
   <aside id="panel" hidden></aside>
@@ -111,12 +111,13 @@
 <script src="js/data.js?v=20261131"></script>
 <script src="js/data-extra.js?v=20261131"></script>
 <script src="js/poi.js?v=20261131"></script>
+<script src="js/land.js?v=20261131"></script>
+<script src="js/geo/land.js?v=20261131"></script>
 <script src="js/regions.js?v=20261131"></script>
 <script src="js/facts.js?v=20261131"></script>
 <script src="js/regions/fixes.js?v=20261131"></script>
 <script src="js/station-badge.js?v=20261131"></script>
 <script src="js/sim.js?v=20261131"></script>
-<script src="js/terrain.js?v=20261131"></script>
 <script src="js/app.js?v=20261131"></script>
 <script src="js/layout.js?v=20261131"></script>
 </body>

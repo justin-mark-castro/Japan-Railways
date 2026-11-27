@@ -39,7 +39,10 @@ kbd{font-size:11px;border:1px solid var(--line);border-radius:6px;padding:1px 6p
 .only-mobile{display:none}
 
 /* sidebar */
-#sidebar{grid-area:side;background:var(--bg2);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;z-index:20;overflow-y:auto}
+#sidebar{grid-area:side;background:var(--bg2);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;z-index:20;overflow:hidden}
+#sidebar>.side-head{flex:none;max-height:46%;overflow:auto;scrollbar-width:thin}
+#opChips{max-height:104px;overflow:auto;scrollbar-width:thin;gap:5px;margin-bottom:8px}
+#opChips .chip{padding:3px 8px;font-size:11.5px;gap:5px}
 .side-head{padding:6px 14px 8px;flex:none}
 .sec>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;padding:9px 0;font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);font-weight:700;user-select:none}
 .sec>summary::-webkit-details-marker{display:none}
@@ -187,9 +190,12 @@ kbd{font-size:11px;border:1px solid var(--line);border-radius:6px;padding:1px 6p
   .icon-btn{font-size:16px}
   .top-actions{gap:5px}
   .top-actions .pill{padding:0 8px}
-  #sidebar{position:fixed;left:0;top:var(--topH);bottom:0;width:min(82vw,300px);font-size:12px;transform:translateX(-102%);transition:transform .2s;z-index:40;box-shadow:var(--shadow);padding-bottom:env(safe-area-inset-bottom)}
+  #sidebar{overflow-y:auto;position:fixed;left:0;top:var(--topH);bottom:0;width:min(82vw,300px);font-size:12px;transform:translateX(-102%);transition:transform .2s;z-index:40;box-shadow:var(--shadow);padding-bottom:env(safe-area-inset-bottom)}
   body.menu #sidebar{transform:none}
   .tog{padding:6px 0;font-size:12px}
+  #sidebar>.side-head{max-height:none;overflow:visible}
+  #opChips{max-height:none}
+  .tp span{font-size:11px;padding:4px 9px}
   .chip{font-size:11px;padding:4px 9px}
   .quick button{height:30px;font-size:11px}
   .lrow .nm b{font-size:12px}
@@ -287,3 +293,13 @@ kbd{font-size:11px;border:1px solid var(--line);border-radius:6px;padding:1px 6p
 .legend-note a{color:inherit;text-decoration:underline;pointer-events:auto}
 .about{font-size:11.5px;line-height:1.5;color:var(--muted);margin:6px 2px 2px}
 .about a{color:var(--accent,inherit)}
+
+/* display switches as compact pills (they used to take five full rows) */
+.tpills{display:flex;flex-wrap:wrap;gap:6px;padding:2px 0 8px}
+.tp{cursor:pointer;user-select:none}
+.tp input{position:absolute;opacity:0;pointer-events:none}
+.tp span{display:block;border:1px solid var(--line);background:var(--panel2);border-radius:999px;padding:4px 11px;font-size:12px;color:var(--muted);transition:.12s}
+.tp:hover span{border-color:var(--accent);color:var(--text)}
+.tp input:checked+span{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--text)}
+.tp input:focus-visible+span{outline:2px solid var(--accent);outline-offset:2px}
+.top-actions .pill svg{display:block;margin:auto}

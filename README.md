@@ -67,6 +67,11 @@ node tools/import/dump-all.mjs > /tmp/all.json
 python3 tools/import/build-shapes.py --mlit /tmp/ext/mlit-json --all /tmp/all.json                                      # real track shapes
 ```
 - **Merging with hand-made data:** stations match by normalised Japanese name (within 3 km, or <60 m); hand-made lines win, imported lines that duplicate one are dropped or trimmed, and service patterns that only re-run other lines (Shonan-Shinjuku Line, Narita Express…) are skipped. `js/regions/fixes.js` (`TRS_GEO_FIX`) snaps hand-typed station coordinates to the accurate open-data positions.
+- **Base map:** `build-land.py` turns the prefecture polygons of 地球地図日本 (see attribution) into `js/geo/land.js`, `land-mid.js` and `land-hi.js` — land, coast and prefecture borders at three levels of detail. The small base file loads at start-up; the finer levels are fetched only when you zoom in, and the coarser one keeps drawing until they arrive. The coast fades out at street zoom, where this 1:1,000,000-scale outline is coarser than the tracks. Lakes (e.g. Lake Biwa) are not cut out of the land.
+  ```bash
+  git clone --depth 1 https://github.com/dataofjapan/land /tmp/geo/land
+  python3 tools/import/build-land.py --geojson /tmp/geo/land/japan.geojson
+  ```
 - **Track shapes:** `build-shapes.py` routes every station-to-station edge over the MLIT N02 railway sections (shortest path on a graph per railway type, preferring the line's own operator; ends are bridged where sections don't quite meet) and writes `js/regions/auto/<region>-shape.js` as simplified encoded polylines. Edges with no plausible route (about 1%) stay straight. A few Shinkansen stations whose hand-typed position was km off are moved onto the track. Trains run along the same curves, so line lengths and journey times use real path length.
 - **Official codes:** the station database carries station numbering and line symbols (JY17, S01, M08…) for about half of the imported lines; those lines show real codes and station numbers. Other lines get a Latin badge derived from the English name (for example "KA" for Kagoshima Main Line) and no station numbers.
 - **English names:** `tools/import/names_en.py` holds a hand-written table of ~150 operators (English name, line-name prefix and its kana reading). Line names are operator + romanised remainder + suffix (and an A–B section where the source splits a line); station names are romanised from kana with Higashi-/Nishi-/Shin- and -mae/-koen/-dori hyphenation. Japanese stays available (switch to 日本語, or see the secondary line).
@@ -82,12 +87,14 @@ python3 tools/import/build-shapes.py --mlit /tmp/ext/mlit-json --all /tmp/all.js
 - Stations, line order, kana and line colours: [station_database](https://github.com/Seo-4d696b75/station_database) by Seo-4d696b75, derived from 駅データ.jp — **CC BY 4.0**.
 - Operator and railway-type data: MLIT 国土数値情報 (National Land Numerical Information) railway data N02, via [antfu/mlit-json](https://github.com/antfu/mlit-json) — follow the MLIT terms of use and credit "国土交通省 国土数値情報".
 - Track geometry: the same MLIT railway data (sections).
+- Land outline and prefecture borders: 地球地図日本 (Global Map Japan), 国土地理院 / Geospatial Information Authority of Japan, via [dataofjapan/land](https://github.com/dataofjapan/land) — credit GSI per its terms of use.
 - Optional real timetables: [Public Transportation Open Data Center (ODPT)](https://www.odpt.org/) — follow each dataset's licence.
 
 ## Structure
 - `js/regions/shinkansen.js` – national Shinkansen layer (loads at start-up)
 - `js/regions/auto/`, `js/regions/fixes.js` – generated nationwide data (see *Nationwide import*)
-- `tools/import/` – open-data importer (`build-auto.py`, `build-shapes.py`, `names_en.py`, `dump-curated.mjs`, `dump-all.mjs`)
+- `tools/import/` – open-data importer (`build-auto.py`, `build-shapes.py`, `build-land.py`, `names_en.py`, `dump-curated.mjs`, `dump-all.mjs`)
+- `js/land.js`, `js/geo/` – base-map layer and its generated data
 - `js/regions.js`, `js/regions/` – prefectures, region loader and lazy region data
 - `js/data.js`, `js/data-extra.js` – stations, lines, colours, codes, frequencies
 - `js/station-badge.js` – station-number badges in Japanese signage style (JR rounded square, ring for Metro/Toei/private); SVG for the UI, canvas for map labels
