@@ -112,7 +112,7 @@
   }
 
   /* ---------------- per-frame geometry ---------------- */
-  const DETAIL_S = 0.0035;   // below this zoom (m→px) only Shinkansen follow their real track shape
+  const DETAIL_S = 0;   // every line follows its real track shape at every zoom (off-screen edges are culled below)
   function lineScreen(L, spacing) {
     const P = L.pts.map(p => ({ x: sx(p.x), y: sy(p.y) }));
     const n = P.length, out = new Array(n);
@@ -292,13 +292,12 @@
     const c = T(), s = S.cam.s, focus = selectedLine();
     const base = clamp(1.6 + 16 * s, 2.4, 7.5) * S.ui * (s < 0.006 ? 0.85 : 1);
     S.stScreen = [];
-    const natl = s < 0.006, margin = 40;
+    const margin = 40;
     Object.values(stations).forEach(st => {
       const x = sx(st.x), y = sy(st.y);
       if (x < -margin || y < -margin || x > S.W + margin || y > S.H + margin) return;
       let vl = stationVisibleLines(st);
       if (!vl.length) return;
-      if (natl && !vl.every(v => v.line.type === 'shin')) return;
       if (S.opts.inter && vl.length < 2) return;
       const inFocus = !focus || vl.some(v => v.line === focus);
       const n = vl.length, r = base * (n > 1 ? 1.28 : 0.95) + (n > 3 ? 1 : 0);
@@ -414,7 +413,6 @@
     const s = S.cam.s, focus = selectedLine(), c = T();
     const R = clamp(0.6 + 72 * s, 3.6, 12.5) * S.ui;
     S.trains.forEach(t => {
-      if (S.cam.s < 0.006 && t.line.type !== 'shin') return;
       const ss = lineSS[t.line.id]; if (!ss) return;
       const p = posScreen(t.line, ss, t.d);
       if (p.x < -40 || p.y < -40 || p.x > S.W + 40 || p.y > S.H + 40) return;
@@ -427,6 +425,11 @@
     S.trainScreen.forEach(t => {
       const L = t.line;
       ctx.globalAlpha = focus && focus !== L ? 0.22 : 1;
+      if (s < 0.006 && t.key !== selKey) {   // zoomed far out: every train is a cheap coloured dot so the whole network stays fast
+        ctx.beginPath(); ctx.arc(t.sx, t.sy, 2.6 * S.ui, 0, 7); ctx.fillStyle = L.color; ctx.fill();
+        ctx.lineWidth = 1; ctx.strokeStyle = '#fff'; ctx.stroke();
+        return;
+      }
       ctx.save(); ctx.translate(t.sx, t.sy);
       // ---- train body (two cars), drawn along heading ----
       ctx.save(); ctx.rotate(t.ang);
@@ -499,10 +502,8 @@
 
   function drawPois() {
     S.poiScreen = [];
-    if (S.cam.s < 0.012) return;
-    S.poiScreen = [];
     if (!S.opts.poi) return;
-    const c = T(), s = S.cam.s, Rp = clamp(8 + 22 * s, 9, 16) * S.ui;
+    const c = T(), s = S.cam.s, Rp = clamp(8 + 22 * s, s < 0.012 ? 6.5 : 9, 16) * S.ui;   // smaller markers when zoomed out, but always shown
     const selId = S.sel && S.sel.type === 'poi' ? S.sel.id : null;
     const hovId = S.hover && S.hover.type === 'poi' ? S.hover.id : null;
     const focus = selectedLine();
@@ -1081,11 +1082,11 @@
   const loadedParts = new Set(['kanto']);   // 'kanto' = built-in hand-authored Tokyo data
   const loadScript = src => new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = src + '?v=' + (window.TRS_VERSION || ''); sc.onload = res; sc.onerror = rej; document.head.appendChild(sc); });
   const failedRegions = new Set();
-  function loadRegion(r) {
+  function loadRegion(r, quiet) {
     if (!r || loadingRegions.has(r.id) || failedRegions.has(r.id)) return;
     const parts = [r.file && { key: r.id, file: r.file }, r.auto && { key: r.id + '-auto', file: r.auto }, r.auto && { key: r.id + '-shape', file: r.auto.replace(/\.js$/, '-shape.js'), optional: true }].filter(p => p && !loadedParts.has(p.key));
     if (!parts.length) { loadedRegions.add(r.id); return; }
-    loadingRegions.add(r.id); if (!r.national) toast('Loading ' + r.en + ' lines…', 6000);
+    loadingRegions.add(r.id); if (!r.national && !quiet) toast('Loading ' + r.en + ' lines…', 6000);
     (async () => {
       let nLines = 0;
       try {
@@ -1096,7 +1097,7 @@
           addRegionData(p.key, d); loadedParts.add(p.key); nLines += (d.LINE_SRC || []).length;
         }
         loadedRegions.add(r.id);
-        if (!r.national) toast(r.en + ' loaded: ' + nLines + ' lines');
+        if (!r.national && !quiet) toast(r.en + ' loaded: ' + nLines + ' lines');
       } catch (_) { failedRegions.add(r.id); toast('Could not load ' + r.en + ' data'); }
       loadingRegions.delete(r.id);
     })();
@@ -1181,7 +1182,15 @@
   try { const th = localStorage.getItem('trs-theme'); if (th) { S.theme = th; document.documentElement.dataset.theme = th; } } catch (_) { }
   resize(); if (S.ui < 0.8) $('q').placeholder = 'Search station, line, spot…';
   fitAll(false); computeOps(); buildIndex(); buildSidebar(); renderPoiChips(); updateArea(); updateAreaLabel();
-  RG.REGIONS.filter(r => r.national || r.builtin).forEach(loadRegion);
+  // load EVERY region (lines, stations, track shapes, spots) up front, so nothing depends on where the map is looking or how far it is zoomed
+  (async () => {
+    const all = RG.REGIONS.filter(r => r.national || r.builtin).concat(RG.REGIONS.filter(r => !r.national && !r.builtin));
+    all.forEach(r => loadRegion(r, true));
+    const t0 = performance.now();
+    while (all.some(r => loadingRegions.has(r.id)) && performance.now() - t0 < 60000) await new Promise(res => setTimeout(res, 150));
+    const bad = all.filter(r => failedRegions.has(r.id));
+    toast(bad.length ? 'Could not load: ' + bad.map(r => r.en).join(', ') : 'All ' + lines.length + ' lines loaded', bad.length ? 5000 : 2200);
+  })();
   const q0 = new URLSearchParams(location.search);
   if (q0.get('t')) S.t = clamp(+q0.get('t') * 3600, TRS.SERVICE_START, TRS.SERVICE_END - 1);
   if (q0.get('line') && byId[q0.get('line')]) selectItem('line', q0.get('line'), true);
