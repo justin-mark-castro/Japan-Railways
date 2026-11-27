@@ -250,6 +250,29 @@
     return lang === 'ja' ? s.ja : s.en;
   }
 
+  // First and last departure of the day at a station, per line and direction (from the simulated or real trips in use)
+  function serviceSpan(net, stationId) {
+    const S = net.stations[stationId], rows = [];
+    S.lines.forEach(({ line: L, idx, skipped }) => {
+      if (skipped) return;
+      const per = {};   // dir -> {first,last,destId}
+      const note = (tp, start, k) => {
+        if (!L.loop && k === tp.stops.length - 1) return;   // terminus: nothing departs
+        const t = start + tp.dep[k], r = per[tp.dir] || (per[tp.dir] = { first: 1e12, last: -1e12, destId: L.ids[tp.stops[tp.stops.length - 1] % L.n] });
+        if (t < r.first) r.first = t; if (t > r.last) r.last = t;
+      };
+      const stopIdx = tp => { for (let j = 0; j < tp.stops.length; j++) if (tp.stops[j] % L.n === idx) return j; return -1; };
+      if (L.real) { L.real.trips.forEach(tr => { const k = stopIdx(tr.tpl); if (k >= 0) note(tr.tpl, tr.start, k); }); }
+      else for (let dir = 0; dir < 2; dir++) {
+        const tpl = L.tpl[dir], k = stopIdx(tpl);
+        if (k < 0 || !tpl.starts.length) continue;
+        note(tpl, tpl.starts[0], k); note(tpl, tpl.starts[tpl.starts.length - 1], k);
+      }
+      Object.keys(per).forEach(d => rows.push({ line: L, dir: +d, first: per[d].first, last: per[d].last, destId: per[d].destId }));
+    });
+    return rows;
+  }
+
   // Upcoming departures for a station
   function board(net, stationId, st, perDir) {
     const S = net.stations[stationId], res = [], per = perDir || 3;
@@ -288,5 +311,5 @@
     return res.sort((a, b) => (a.times[0] ?? 1e9) - (b.times[0] ?? 1e9));
   }
 
-  g.TRS = { build, setRealTrips, proj, unproj, tripState, activeTrips, board, headwayAt, periodOf, PERIOD_LABEL, destName, lowerBound, SERVICE_START, SERVICE_END, LAT0, LON0 };
+  g.TRS = { build, setRealTrips, proj, unproj, tripState, activeTrips, board, serviceSpan, headwayAt, periodOf, PERIOD_LABEL, destName, lowerBound, SERVICE_START, SERVICE_END, LAT0, LON0 };
 })(typeof window !== 'undefined' ? window : globalThis);

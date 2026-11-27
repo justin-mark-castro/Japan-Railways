@@ -75,8 +75,8 @@
   const cv = $('map'), mainCtx = cv.getContext('2d');
   let ctx = mainCtx;   // swapped to the off-screen map layer while it is being redrawn
   const THEME = {
-    dark: { bg: '#0c1117', water: '#0f2233', river: '#12293d', park: 'rgba(60,120,80,.18)', grid: 'rgba(255,255,255,.035)', casing: 'rgba(5,9,14,.85)', stFill: '#f4f7fa', stStroke: '#0a0f15', label: '#e8eef5', halo: 'rgba(12,17,23,.9)', sub: '#8fa1b5' },
-    light: { bg: '#eef2f6', water: '#cfe3f3', river: '#c4dcef', park: 'rgba(90,170,110,.22)', grid: 'rgba(0,0,0,.04)', casing: 'rgba(255,255,255,.9)', stFill: '#ffffff', stStroke: '#26323f', label: '#14202c', halo: 'rgba(238,242,246,.95)', sub: '#5d6f82' }
+    dark: { bg: '#0c1117', sea: '#0a1520', land: '#141d28', coast: 'rgba(124,196,255,.28)', border: 'rgba(255,255,255,.07)', water: '#0f2233', river: '#12293d', park: 'rgba(60,120,80,.18)', grid: 'rgba(255,255,255,.035)', casing: 'rgba(5,9,14,.85)', stFill: '#f4f7fa', stStroke: '#0a0f15', label: '#e8eef5', halo: 'rgba(12,17,23,.9)', sub: '#8fa1b5' },
+    light: { bg: '#eef2f6', sea: '#d6e6f3', land: '#f8faf6', coast: 'rgba(40,90,140,.35)', border: 'rgba(0,0,0,.09)', water: '#cfe3f3', river: '#c4dcef', park: 'rgba(90,170,110,.22)', grid: 'rgba(0,0,0,.04)', casing: 'rgba(255,255,255,.9)', stFill: '#ffffff', stStroke: '#26323f', label: '#14202c', halo: 'rgba(238,242,246,.95)', sub: '#5d6f82' }
   };
   const T = () => THEME[S.theme];
 
@@ -211,14 +211,25 @@
     for (let y = Math.floor(wy(0) / step) * step; y < wy(S.H); y += step) { const Y = Math.round(sy(y)) + .5; ctx.moveTo(0, Y); ctx.lineTo(S.W, Y); }
     ctx.stroke();
     if (!S.opts.water) return;
+    const TT = window.TRS_TERRAIN, haveLand = !!(TT && TT.ready);
+    if (haveLand) {
+      // whole-of-Japan land mass in the same projection as the rails: sea first, then land, prefecture borders, coast
+      ctx.fillStyle = c.sea; ctx.fillRect(0, 0, S.W, S.H);
+      const lod = TT.lodFor(S.cam.s), x0 = wx(0), x1 = wx(S.W), y0 = wy(0), y1 = wy(S.H), vis = [];
+      TT.rings.forEach(r => { if (r.x1 >= x0 && r.x0 <= x1 && r.y1 >= y0 && r.y0 <= y1) vis.push(r.lods[lod]); });
+      const trace = () => { ctx.beginPath(); vis.forEach(a => { ctx.moveTo(sx(a[0]), sy(a[1])); for (let i = 2; i < a.length; i += 2) ctx.lineTo(sx(a[i]), sy(a[i + 1])); ctx.closePath(); }); };
+      trace(); ctx.fillStyle = c.land; ctx.fill('evenodd');
+      ctx.lineJoin = 'round'; ctx.strokeStyle = c.border; ctx.lineWidth = 1; ctx.stroke();
+      trace(); ctx.strokeStyle = c.coast; ctx.lineWidth = Math.max(1, Math.min(2.2, 0.8 + S.cam.s * 30)); ctx.stroke();
+    }
     // parks
     ctx.fillStyle = c.park;
     PARKS.forEach(p => { ctx.beginPath(); ctx.ellipse(sx(p.x), sy(p.y), p.rx * S.cam.s, p.ry * S.cam.s, 0, 0, 7); ctx.fill(); });
-    // bay
-    ctx.fillStyle = c.water;
-    WATER_POLYS.forEach(poly => { ctx.beginPath(); poly.forEach((p, i) => (i ? ctx.lineTo(sx(p.x), sy(p.y)) : ctx.moveTo(sx(p.x), sy(p.y)))); ctx.closePath(); ctx.fill(); });
+    // bay (hand-drawn Tokyo Bay is only needed when the nationwide land layer failed to load)
+    if (!haveLand) ctx.fillStyle = c.water;
+    if (!haveLand) WATER_POLYS.forEach(poly => { ctx.beginPath(); poly.forEach((p, i) => (i ? ctx.lineTo(sx(p.x), sy(p.y)) : ctx.moveTo(sx(p.x), sy(p.y)))); ctx.closePath(); ctx.fill(); });
     ctx.fillStyle = c.bg;
-    LAND_PTS.forEach(poly => { ctx.beginPath(); poly.forEach((p, i) => (i ? ctx.lineTo(sx(p.x), sy(p.y)) : ctx.moveTo(sx(p.x), sy(p.y)))); ctx.closePath(); ctx.fill(); });
+    if (!haveLand) LAND_PTS.forEach(poly => { ctx.beginPath(); poly.forEach((p, i) => (i ? ctx.lineTo(sx(p.x), sy(p.y)) : ctx.moveTo(sx(p.x), sy(p.y)))); ctx.closePath(); ctx.fill(); });
     ctx.strokeStyle = c.river; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     RIVER_PTS.forEach(r => {
       ctx.lineWidth = Math.max(1.5, r.w * S.cam.s * 55);
@@ -556,7 +567,7 @@
     ctx.setTransform(S.dpr, 0, 0, S.dpr, 0, 0);
     // background + lines are costly to rasterise, so they live in an off-screen layer that is only redrawn when something about them changes
     const fl = selectedLine();
-    const key = [S.cam.x.toFixed(2), S.cam.y.toFixed(2), S.cam.s.toFixed(7), S.W, S.H, S.dpr, S.ui, S.theme, S.opts.water, netVer, lines.length, S.hidden.size, fl ? fl.id : '', S.hidden.size < 40 ? [...S.hidden].join(',') : ''].join('|');
+    const key = [S.cam.x.toFixed(2), S.cam.y.toFixed(2), S.cam.s.toFixed(7), S.W, S.H, S.dpr, S.ui, S.theme, S.opts.water, (window.TRS_TERRAIN ? TRS_TERRAIN.ver : 0), netVer, lines.length, S.hidden.size, fl ? fl.id : '', S.hidden.size < 40 ? [...S.hidden].join(',') : ''].join('|');
     if (layer.width !== cv.width || layer.height !== cv.height) { layer.width = cv.width; layer.height = cv.height; layerKey = ''; }
     if (key !== layerKey) {
       ctx = layer.getContext('2d'); ctx.setTransform(S.dpr, 0, 0, S.dpr, 0, 0);
@@ -733,10 +744,31 @@
       <div class="p-body">
         <div class="p-sec">Lines <span class="live" style="margin-left:8px;text-transform:none;letter-spacing:0">simulated</span></div>
         <div class="xfer">${xfers.map(x => `<div class="xf" data-line="${x.line.id}">${bdg(x.line, x.num, true)}<span>${lineName(x.line)}</span></div>`).join('')}</div>
+        <div class="p-sec">Station facts</div>
+        ${factsHTML(st)}
+        <div class="p-sec">First &amp; last train <span class="live" style="margin-left:8px;text-transform:none;letter-spacing:0">${S.dataMode === 'sim' ? 'simulated' : 'timetable'}</span></div>
+        ${spanHTML(st)}
         <div class="p-sec">Next departures</div>
         <div id="boardBox">${boardHTML(st.id)}</div>
         <div class="btn-row"><button class="btn primary" data-act="zoomst">Zoom to station</button></div>
       </div>`;
+  }
+  function factsHTML(st) {
+    const f = (window.TRS_FACTS || {})[st.id];
+    const cell = (v, label) => `<div><b>${v == null ? '—' : v}</b><small>${label}</small></div>`;
+    return `<div class="kv">${cell(f && f.exits, 'exits')}${cell(f && f.platforms, 'platforms')}</div>` +
+      `<div class="empty-note" style="margin:6px 0 10px">${f ? f.note : 'Exit and platform counts are not in the dataset yet — only a few major stations have been researched.'}</div>`;
+  }
+  function spanHTML(st) {
+    const rows = TRS.serviceSpan(net, st.id);
+    if (!rows.length) return '<div class="empty-note">No departures from this station.</div>';
+    const dn = r => r.line.loop ? TRS.destName(r.line, r.dir, stations, S.lang) : (S.lang === 'ja' ? stations[r.destId].ja : stations[r.destId].en);
+    const first = Math.min(...rows.map(r => r.first)), last = Math.max(...rows.map(r => r.last));
+    return `<div class="kv"><div><b>${hms(first)}</b><small>first train</small></div><div><b>${hms(last)}</b><small>last train</small></div></div>` +
+      rows.sort((a, b) => a.line.order - b.line.order || a.dir - b.dir).slice(0, 16).map(r => {
+        const idx = st.lines.find(x => x.line === r.line).idx;
+        return `<div class="brow" data-line="${r.line.id}">${bdg(r.line, r.line.nums[idx], true)}<div class="dest"><b>${S.lang === 'ja' ? '' : 'For '}${dn(r)}</b><small>${lineName(r.line)}</small></div><div class="tms"><b>${hms(r.first)}</b><span>last ${hms(r.last)}</span></div></div>`;
+      }).join('');
   }
   function boardHTML(id) {
     const rows = TRS.board(net, id, S.t, 2).filter(b => isVisible(b.line) && b.times.length);
@@ -1193,6 +1225,7 @@
   })();
   const q0 = new URLSearchParams(location.search);
   if (q0.get('t')) S.t = clamp(+q0.get('t') * 3600, TRS.SERVICE_START, TRS.SERVICE_END - 1);
+  if (q0.get('pref') && RG.prefById[q0.get('pref')]) { const pf = RG.prefById[q0.get('pref')], q = TRS.proj(pf.lat, pf.lon); flyTo(q.x, q.y, 0.045, 0); }
   if (q0.get('line') && byId[q0.get('line')]) selectItem('line', q0.get('line'), true);
   if (q0.get('stn') && stations[q0.get('stn')]) selectItem('station', q0.get('stn'), true);
   window.__TRS = { S, net, flyTo, selectItem, flyToPref, TRS };

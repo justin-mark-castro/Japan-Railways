@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prefectures of Japan — Rail Sim</title>
+<link rel="stylesheet" href="css/style.css?v=20261131">
+<style>
+  html,body{height:auto;min-height:100%;overflow:auto}
+  .pg{max-width:1100px;margin:0 auto;padding:18px 16px 60px}
+  .pg-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+  .pg-top h1{font-size:22px;margin:0;flex:1;min-width:200px}
+  .pg-top a.pill{display:grid;place-items:center;text-decoration:none;color:var(--text)}
+  .pg-sub{color:var(--muted);font-size:13px;margin:0 0 14px}
+  .pg input[type=search]{width:100%;max-width:420px;height:40px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);padding:0 12px;outline:none}
+  .pg input[type=search]:focus{border-color:var(--accent)}
+  .reg{margin:26px 0 10px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:8px}
+  .reg i{width:10px;height:10px;border-radius:3px;display:inline-block}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
+  .card-p{display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px;text-decoration:none;color:inherit;transition:border-color .15s,transform .15s}
+  .card-p:hover{border-color:var(--accent);transform:translateY(-2px)}
+  .card-p svg{flex:none}
+  .card-p b{display:block;font-size:15px}
+  .card-p small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+  .card-p em{display:block;font-style:normal;font-size:11px;color:var(--accent);margin-top:4px}
+  .note{color:var(--muted);font-size:12px;margin-top:30px;line-height:1.5}
+</style>
+</head>
+<body>
+<div class="pg">
+  <div class="pg-top">
+    <h1>Prefectures of Japan <small style="color:var(--muted);font-weight:500">都道府県</small></h1>
+    <a class="pill" href="index.html">← Back to map</a>
+    <button id="themeBtn" class="pill" title="Toggle theme">◐</button>
+  </div>
+  <p class="pg-sub">All 47 prefectures. Tap one to open the map at that prefecture.</p>
+  <input id="q" type="search" placeholder="Search prefecture — Hokkaido, 京都, Kyushu…" autocomplete="off">
+  <div id="out"></div>
+  <p class="note">Badges are original illustrations (region colour + the prefecture's name in kanji), not the official prefectural emblems. Official emblems are protected marks; see each prefecture's Wikipedia page for the real ones.</p>
+</div>
+<script src="js/regions.js?v=20261131"></script>
+<script>
+(function () {
+  const RG = TRS_REGIONS;
+  const COL = { hokkaido: '#2EA6A0', tohoku: '#5B8DEF', kanto: '#E5604D', chubu: '#9A6FD8', kansai: '#E8A33D', chugoku: '#4FAE6B', shikoku: '#D860A0', kyushu: '#D9C13B' };
+  const ORDER = ['hokkaido', 'tohoku', 'kanto', 'chubu', 'kansai', 'chugoku', 'shikoku', 'kyushu'];
+  const short = ja => ja === '北海道' ? ja : ja.replace(/[都府県]$/, '');
+  try { const th = localStorage.getItem('trs-theme'); if (th) document.documentElement.dataset.theme = th; } catch (_) {}
+  document.getElementById('themeBtn').onclick = () => {
+    const t = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = t; try { localStorage.setItem('trs-theme', t); } catch (_) {}
+  };
+  // original badge: rounded shield in the region colour, kanji name, small English abbreviation underneath
+  function badge(p, col) {
+    const k = short(p.ja), fs = k.length >= 3 ? 13.5 : k.length === 2 ? 22 : 32;
+    return `<svg width="58" height="58" viewBox="0 0 58 58" aria-hidden="true">
+      <defs><linearGradient id="g${p.id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${col}"/><stop offset="1" stop-color="${col}" stop-opacity=".72"/></linearGradient></defs>
+      <path d="M29 3 C38 8 47 8 54 7 V30 C54 42 43 51 29 56 C15 51 4 42 4 30 V7 C11 8 20 8 29 3Z" fill="url(#g${p.id})" stroke="rgba(255,255,255,.55)" stroke-width="1.5"/>
+      <text x="29" y="${k.length >= 2 ? 28 : 31}" text-anchor="middle" dominant-baseline="middle" font-size="${fs}" font-weight="800" fill="#fff" style="paint-order:stroke;stroke:rgba(0,0,0,.25);stroke-width:2px" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif">${k}</text>
+      <text x="29" y="46" text-anchor="middle" font-size="8.5" font-weight="700" fill="rgba(255,255,255,.92)" font-family="Inter,system-ui,sans-serif" letter-spacing=".6">${p.en.slice(0, 3).toUpperCase()}</text></svg>`;
+  }
+  const regOf = id => (RG.regionOfPref[id] || {}).id;
+  const groupOf = id => { const r = regOf(id); return r === 'kyushu' ? 'kyushu' : r; };
+  function render() {
+    const f = document.getElementById('q').value.toLowerCase().replace(/\s/g, '');
+    let html = '';
+    ORDER.forEach(rid => {
+      const reg = RG.REGIONS.find(r => r.id === rid);
+      const list = RG.PREFS.filter(p => groupOf(p.id) === rid && (!f || (p.en + p.ja + reg.en + reg.ja).toLowerCase().includes(f)));
+      if (!list.length) return;
+      html += `<div class="reg"><i style="background:${COL[rid]}"></i>${reg.en} · ${reg.ja}</div><div class="grid">` +
+        list.map(p => `<a class="card-p" href="index.html?pref=${p.id}">${badge(p, COL[rid])}<div><b>${p.en}</b><small>${p.ja}</small><em>View on map →</em></div></a>`).join('') + '</div>';
+    });
+    document.getElementById('out').innerHTML = html || '<p class="pg-sub" style="margin-top:20px">No prefecture matches.</p>';
+  }
+  document.getElementById('q').oninput = render; render();
+})();
+</script>
+</body>
+</html>
