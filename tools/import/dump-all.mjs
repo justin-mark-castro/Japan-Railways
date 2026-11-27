@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const ctx = { console }; ctx.window = ctx; ctx.globalThis = ctx; vm.createContext(ctx);
 const run = f => vm.runInContext(fs.readFileSync(path.join(root, f), 'utf8'), ctx, { filename: f });
-['js/data.js', 'js/data-extra.js', 'js/regions/fixes.js'].forEach(run);
+['js/data.js', 'js/data-extra.js', 'js/data-fixes.js', 'js/regions/fixes.js'].forEach(run);
 const sets = [{ owner: 'kanto', d: ctx.TRS_DATA }];
 const reg = fs.readdirSync(path.join(root, 'js/regions')).filter(f => f.endsWith('.js'));
 reg.forEach(f => { run('js/regions/' + f); });

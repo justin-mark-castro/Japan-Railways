@@ -305,10 +305,10 @@ hase|Hase|長谷|35.3120|139.5330
 yuigahama|Yuigahama|由比ヶ浜|35.3130|139.5400
 wadazuka|Wadazuka|和田塚|35.3150|139.5455
 kamakura|Kamakura|鎌倉|35.3190|139.5500
-resortgateway|Resort Gateway|リゾートゲートウェイ|35.6385|139.8840
-tokyodisneyland|Tokyo Disneyland|東京ディズニーランド|35.6335|139.8785
+resortgateway|Resort Gateway|リゾートゲートウェイ・ステーション|35.6385|139.8840
+tokyodisneyland|Tokyo Disneyland|東京ディズニーランド・ステーション|35.6335|139.8785
 disneybayside|Bayside Station|ベイサイド・ステーション|35.6295|139.8830
-tokyodisneysea|Tokyo DisneySea|東京ディズニーシー|35.6320|139.8885
+tokyodisneysea|Tokyo DisneySea|東京ディズニーシー・ステーション|35.6320|139.8885
 `;
 
   const J = (o) => D.LINE_SRC.push(o);

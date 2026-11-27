@@ -49,7 +49,7 @@ def romaji(kana):
             out.append("n'" if nxt and nxt in 'あいうえおやゆよ' else 'n'); i += 1; continue
         syl = BASE.get(c)
         if syl is None: out.append(c); i += 1; continue
-        if i + 1 < len(s) and s[i + 1] in COMBO and c in 'きしちにひみりぎじびぴゔ':
+        if i + 1 < len(s) and s[i + 1] in COMBO and c in 'きしちぢにひみりぎじびぴゔ':
             v = COMBO[s[i + 1]]; stem = syl[:-1] if syl.endswith('i') else syl
             if syl in ('shi', 'chi', 'ji'): stem = syl[:-1]; syl = stem + ('' if v == 'i' else v)
             else: syl = stem + 'y' + v
@@ -63,21 +63,60 @@ def romaji(kana):
     return r.replace("n'", "n'")
 def cap(s): return re.sub(r"(^|[- ])([a-z])", lambda m: m.group(1) + m.group(2).upper(), s)
 DIR_PREFIX = {'東': 'ひがし', '西': 'にし', '南': 'みなみ', '北': 'きた', '新': 'しん'}
-STATION_EN_OVERRIDE = {'成田空港（成田第１ターミナル）': 'Narita Airport Terminal 1', '空港第２ビル（成田第２・第３ターミナル）': 'Narita Airport Terminals 2・3'.replace('・', '·'),
+STATION_EN_OVERRIDE = {'第一イン新湊 クロスベイ前': 'Daiichi Inn Shinminato Cross Bay-mae', '宮島ボートレース場': 'Miyajima Boat Race Course', 'トヨタモビリティ富山 Gスクエア五福前（五福末広町）': 'Toyota Mobility Toyama G Square Gofuku-mae (Gofuku-Suehirocho)', 'オークスカナルパークホテル富山前': 'Oakes Canal Park Hotel Toyama-mae',
+                       '鹿島サッカースタジアム（臨）': 'Kashima Soccer Stadium', 'Jヴィレッジ': 'J-Village', 'ガーラ湯沢': 'GALA Yuzawa', '東山・おかでんミュージアム駅': 'Okaden Museum', '計算科学センター（神戸どうぶつ王国・「富岳」前）': 'Computational Science Center (Kobe Animal Kingdom)',
+                       '成田空港（成田第１ターミナル）': 'Narita Airport Terminal 1', '空港第２ビル（成田第２・第３ターミナル）': 'Narita Airport Terminals 2・3'.replace('・', '·'),
                        '成田空港': 'Narita Airport', '羽田空港': 'Haneda Airport'}
+# katakana loanwords are translated rather than romanised (センター -> Center, not "Sentaa"); longest first
+LOAN = [('ボートレース', 'Boat Race'), ('アート', 'Art'), ('セントラル', 'Central'), ('スタジアムシティ', 'Stadium City'), ('ビジネスパーク', 'Business Park'), ('ニュータウン', 'New Town'), ('ポートタウン', 'Port Town'), ('ウッディタウン', 'Woody Town'),
+        ('ターミナルビル', 'Terminal Building'), ('ユニバーサルシティ', 'Universal City'), ('ディズニーランド', 'Disneyland'), ('ディズニーシー', 'DisneySea'),
+        ('ステーション', 'Station'), ('ターミナル', 'Terminal'), ('センター', 'Center'), ('ケーブル', 'Cable'), ('タウン', 'Town'), ('パーク', 'Park'), ('スタジアム', 'Stadium'),
+        ('キャンパス', 'Campus'), ('ホテル', 'Hotel'), ('ガーデン', 'Garden'), ('ビーチ', 'Beach'), ('スキー', 'Ski'), ('サーキット', 'Circuit'), ('プール', 'Pool'), ('サンドーム', 'Sun Dome'),
+        ('ドーム', 'Dome'), ('トロッコ', 'Torokko'), ('ミュージアム', 'Museum'), ('フラワー', 'Flower'), ('ワールド', 'World'), ('スクウェア', 'Square'), ('フォーゲル', 'Vogel'),
+        ('イングリッシュ', 'English'), ('ハートピア', 'Heartopia'), ('ホール', 'Hall'), ('フルーツ', 'Fruit'), ('ポート', 'Port'), ('ロープウェイ', 'Ropeway'), ('アリーナ', 'Arena'),
+        ('ビール', 'Beer'), ('ラベンダー', 'Lavender'), ('アーケード', 'Arcade'), ('モール', 'Mall'), ('プラーザ', 'Plaza'), ('スポーツ', 'Sports'), ('サッカー', 'Soccer'),
+        ('リハビリ', 'Rehabilitation'), ('フェリー', 'Ferry'), ('テレポート', 'Teleport'), ('テレコム', 'Telecom'), ('スカイツリー', 'Skytree'), ('ベイサイド', 'Bayside'),
+        ('シーサイド', 'Seaside'), ('ゲートウェイ', 'Gateway'), ('リゾート', 'Resort'), ('グリーン', 'Green'), ('ノース', 'North'), ('サウス', 'South'), ('ヴィレッジ', 'Village'),
+        ('ガーラ', 'GALA'), ('ノーフォーク', 'Norfolk'), ('ミュージアム', 'Museum'), ('バス', 'Bus'), ('スペース', 'Space'), ('グリーン', 'Green'), ('ブルー', 'Blue'), ('トレード', 'Trade'),
+        ('ボート', 'Boat'), ('ガーデン', 'Garden'), ('ビル', 'Building'), ('ハーモニー', 'Harmony'), ('アイランド', 'Island'), ('マリン', 'Marine'), ('フジテック', 'Fujitec'),
+        ('インテック', 'Intec'), ('ソシオ', 'Socio'), ('メディカル', 'Medical'), ('ファミリー', 'Family'), ('フェリー', 'Ferry'), ('スクリーン', 'Screen'), ('スクエア', 'Square')]
+LOAN.sort(key=lambda x: -len(x[0]))
+def loan_split(name, k):
+    """split `name` (and its hiragana reading k) at the first katakana loanword and translate it; None if there is none"""
+    for w, en in LOAN:
+        kw = kata2hira(w)
+        if name.count(w) == 1 and k.count(kw) == 1:
+            A, B = name.split(w); ka, kb = k.split(kw)
+            out = en_station(A, ka) + ' ' if A else ''
+            out += en
+            if B:
+                if B.startswith('前') and kb.startswith('まえ'): out += '-mae' + (' ' + en_station(B[1:], kb[2:]) if len(B) > 1 else '')
+                else: out += ' ' + en_station(B, kb)
+            return out.strip()
+    return None
+LINE_EN_OVERRIDE = {31024: 'Kintetsu Nishi-Shigi Cable Line', 31026: 'Kintetsu Ikoma Cable Line', 32008: 'Nankai Koyasan Cable Line', 33005: 'Keihan Iwashimizu-Hachimangu Sando Cable Line',
+                    99625: 'Osaka Metro Nanko Port Town Line', 99648: 'Kobe New Transit Port Island Line', 99316: 'Yokohama Subway Blue Line', 99343: 'Yokohama Subway Green Line',
+                    99928: 'Heisei Chikuho Railway Mojiko Retro Line'}
+DROP_LINES = re.compile(r'^(北近畿タンゴ鉄道|近鉄内部線|近鉄八王子線)')   # superseded operator names that the database still lists next to the current ones (Kyoto Tango Railway, Yokkaichi Asunarou)
 def en_station(name, kana):
     if name in STATION_EN_OVERRIDE: return STATION_EN_OVERRIDE[name]
-    m = re.match(r'^(.*?)\s*[(（](.*)[)）]\s*$', name)
+    m = re.match(r'^(.*?)\s*[(（〈](.*)[)）〉]\s*$', name)
     if m:   # "Base (alias)": romanise each part from its own reading when the data has one
         kb, kp = split_paren(kata2hira(kana or ''))
         base = en_station(m.group(1), kb or kata2hira(kana or ''))
         return base + (' (%s)' % en_station(m.group(2), kp) if kp else '')
     k = kata2hira(kana or ''); r = romaji(k)
     if not r: return name
+    if re.search(r'[ァ-ヴ]', name):
+        ls = loan_split(name, k)
+        if ls: return ls
     n = name.replace('ケ', 'ヶ')
     # Higashi-/Nishi-/Minami-/Kita-/Shin- compounds (Higashi-Ikebukuro, Shin-Osaka) but not two-character names (Higashiyama, Shinjuku)
     if len(n) >= 3 and n[0] in DIR_PREFIX and k.startswith(DIR_PREFIX[n[0]]) and not n.startswith('新宿'):
         head = DIR_PREFIX[n[0]]; r = romaji(head) + '-' + romaji(k[len(head):])
+    mc = re.search(r'(it?chome|nichome|sanchome|yonchome|gochome|rokuchome|nanachome|hatchome|kyuchome|jutchome)$', r)
+    if mc and re.search(r'[一二三四五六七八九十]丁目$', n) and len(n) > 4:   # 西新宿五丁目 -> Nishi-Shinjuku-gochome
+        return cap(r[:mc.start()].rstrip('-')) + '-' + mc.group(1)
     for suf_ja, suf_k in (('前', 'まえ'), ('公園', 'こうえん'), ('通', 'どおり'), ('通', 'とおり'), ('通', 'どうり'), ('丁目', 'ちょうめ'), ('中央', 'ちゅうおう')):
         if n.endswith(suf_ja) and k.endswith(suf_k) and len(n) > len(suf_ja) + 1:
             tail = romaji(suf_k)
@@ -90,7 +129,7 @@ def en_name_kana(kana): return cap(romaji(kana))
 
 FW = str.maketrans('０１２３４５６７８９ＡＢＣＤＥＬ', '0123456789ABCDEL')
 def split_paren(t):
-    m = re.match(r'^(.*?)[(（](.*)[)）]\s*$', t or '')
+    m = re.match(r'^(.*?)[(（〈](.*)[)）〉]\s*$', t or '')
     return (m.group(1), m.group(2)) if m else (t or '', '')
 def sim(a, b): return sum(x == y for x, y in zip(a, b)) / max(len(a), len(b), 1)
 def en_line(name, kana, st_lookup=None):
@@ -149,7 +188,7 @@ symbols = {int(r['code']): r['symbol'] for r in csv.DictReader(open(os.path.join
 n02 = json.load(open(os.path.join(args.mlit, 'data', 'stations.json')))
 cur = json.load(open(args.curated))
 
-def norm(n): return re.sub(r'[駅\s・･（）()]', '', (n or '').replace('ケ', 'ヶ').replace('ヵ', 'ヶ'))
+def norm(n): return re.sub(r'[駅\s・･（）()]', '', re.sub(r'[(（〈][^)）〉]*[)）〉]', '', n or '').replace('ケ', 'ヶ').replace('ヵ', 'ヶ'))   # drops disambiguating parentheses: 三田(東京) = 三田
 G = 0.02
 def gkey(lat, lon): return (int(lat / G), int(lon / G))
 n02_grid = collections.defaultdict(list)
@@ -173,9 +212,11 @@ def merge_target(s):
         for db in range(-2, 3):
             for cid, c in cur_grid.get((a + da, b + db), []):
                 d = km(s['lat'], s['lng'], c['lat'], c['lon'])
-                if (norm(c['ja']) == norm(s['name']) and d < 3.0) or d < 0.06:
-                    if best is None or d < best[0]: best = (d, cid)
-    return best
+                same = norm(c['ja']) == norm(s['name']) and d < 3.0
+                if same or d < 0.06:
+                    key = (0 if same else 1, d)   # a same-name station always beats a merely nearby one (Toei Bakuro-Yokoyama sits ~50 m from JR Bakurocho)
+                    if best is None or key < best[0]: best = (key, d, cid)
+    return (best[1], best[2]) if best else None
 for code, s in stations.items():
     t = merge_target(s)
     if t:
@@ -194,6 +235,7 @@ SPURS = {'JR成田線': ('成田', ('空港第２ビル', '成田空港'), 'JR�
 def jobs():
     for lm in line_meta:
         if lm['closed']: continue
+        if DROP_LINES.match(lm['name']): dropped['superseded operator name'] += 1; continue
         d = json.load(open(os.path.join(sdb_dir, 'line', '%d.json' % lm['code'])))
         sl = [s for s in d['station_list'] if not s['closed']]
         sp = SPURS.get(lm['name'])
@@ -206,7 +248,32 @@ def jobs():
                 yield lm2, d2, junc[:1] + spur
                 continue
         yield lm, d, sl
-for lm, d, sl in jobs():
+# Lines the database lists as one run although a branch is tacked on after the main line's last station: the phantom edge between the two would
+# draw a 30-75 km straight line.  Cut at the jump; JUNCTION says which main-line station the branch hangs off (code: (station, prepend|append)).
+JUNCTION = {11303: ('尻手', 'prepend'), 11327: ('成田', 'append'), 11807: None}   # 11807 (Yosan/Uchiko): two routes with different symbols (U / S) listed as one run, no shared station
+def symbol_of(s):
+    for n in (s.get('numbering') or []):
+        m = re.match(r'^([A-Za-z]{1,4})', n)
+        if m: return m.group(1).upper()
+    return None
+def split_jumps(lm, d, sl):
+    cut = None
+    for i in range(1, len(sl)):
+        gap = km(sl[i - 1]['lat'], sl[i - 1]['lng'], sl[i]['lat'], sl[i]['lng'])
+        if lm['code'] in JUNCTION and gap > 15: cut = i; break   # only the lines listed in JUNCTION (rural gaps and Shinkansen station spacing are real)
+    if cut is None: yield lm, d, sl; return
+    a, b = sl[:cut], sl[cut:]
+    jn = JUNCTION.get(lm['code'])
+    if jn:
+        j = [x for x in a if x['name'] == jn[0]]
+        if j: b = (j[:1] + b) if jn[1] == 'prepend' else (b + j[:1])
+    print('  split %s (%s) at %s -> %s (%.0f km)%s' % (lm['name'], lm['code'], sl[cut - 1]['name'], sl[cut]['name'], km(sl[cut - 1]['lat'], sl[cut - 1]['lng'], sl[cut]['lat'], sl[cut]['lng']), ' junction ' + jn[0] if jn else ' (no junction)'), file=sys.stderr)
+    yield from split_jumps(lm, d, a)
+    lm2 = dict(lm, code=lm['code'] * 100 + 80 + (1 if jn else 2), name=lm['name'] + ('(支線)' if jn else '(別区間)'), sym_code=lm['code'])
+    yield from split_jumps(lm2, dict(d, name_kana=(d.get('name_kana') or '') + 'しせん'), b)
+def jobs2():
+    for lm, d, sl in jobs(): yield from split_jumps(lm, d, sl)
+for lm, d, sl in jobs2():
     if len(sl) < 2: continue
     ids = []
     for s in sl:
@@ -263,7 +330,10 @@ for lm, d, sl in jobs():
     ja = name if (len(name) > 3 or op in name) else (op + name if op else name)
     st_lookup = {norm(x['name']): en_station(x['name'], x.get('name_kana')) for x in sl}
     en = en_line(name, d.get('name_kana'), st_lookup)
-    if lm.get('sym_code'): en = 'JR Narita Line (Airport Branch)'
+    if lm['code'] == 1132790: en = 'JR Narita Line (Airport Branch)'
+    if lm['name'].endswith('(支線)'): en = en.replace(' Branch', '') + ' (Branch)'
+    elif lm['name'].endswith('(別区間)'): en += ' (Other Section)'
+    en = LINE_EN_OVERRIDE.get(lm['code'], en)
     if len(name) <= 3 and op in OP_EN and not en.startswith(OP_EN[op].split()[0]): en = (OP_EN[op] + ' ' + en).strip()
     # official station numbering (駅ナンバリング): use it when most stops carry a number with the line's symbol
     NUM_RE = re.compile(r'^([A-Za-z]{1,4})[\s\-]?(\d{1,3})$')
